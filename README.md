@@ -9,7 +9,7 @@ Schiffe und Flugzeuge live auf einem Globus – gemacht fürs Handy, schön auch
 - **Echte Größe:** Nah herangezoomt werden Schiffe als Rumpf in ihrer echten Länge und Breite gezeigt (an der richtigen Stelle zur AIS-Antenne), Flugzeuge mit ihrer echten Spannweite.
 - **Antippen** zeigt alles, was bekannt ist – Schiffe: Foto, Art, Flagge, Tempo, Kurs, Ziel mit Ankunft, Maße, Tiefgang, Werft, Baujahr, Tonnage, Eigner, Fahrtweg der letzten 24 Stunden, „kommt dir am nächsten in … min“; Flugzeuge: Foto, Fluggesellschaft, Route mit Fortschritt und Ankunftszeit, Typ, Kennzeichen, Höhe, Steigrate, Tempo, Mach, Wind und Temperatur in Flughöhe, Squawk mit Bedeutung, Flugweg.
 - **Liste, Highlights, Filter:** Was ist in der Nähe, was ist das größte Schiff / das höchste Flugzeug, Notfälle, Arten ein- und ausblenden.
-- **Live-Blick:** Handy auf ein Schiff oder Flugzeug halten – Name und Infos erscheinen genau dort, wo es ist (Kamera, Kompass, Lagesensoren). Antippen für mehr, „Hinführen“ zeigt mit einem Pfeil, wohin man schauen muss. Kompass-Abgleich an einem bekannten Objekt.
+- **Live-Blick:** Handy auf ein Schiff oder Flugzeug halten – es erscheint genau dort, wo es ist (Kamera, Kompass, Lagesensoren): Schiffe als Seitenansicht je nach Art (Containerschiff, Tanker, Fähre, Segelboot, Schlepper, Fischkutter …), Bug in Fahrtrichtung, Flugzeuge als Umriss mit der Nase in Flugrichtung – nah und groß auch in ihrer echten Größe. Antippen öffnet alle Infos wie auf der Karte (Foto, Route, Register, Flugdaten …) plus Blickrichtung und Höhe über dem Horizont. „Hinführen“ zeigt mit einem Pfeil, wohin man schauen muss. Kompass-Abgleich an einem bekannten Objekt.
 
 Nicht für die Navigation! Daten können fehlen, verspätet oder falsch sein.
 
@@ -50,7 +50,8 @@ Reines HTML/CSS/JavaScript (ES-Module), kein Build-Schritt.
 | `js/flugzeuge.js` | Flugdaten über den Vermittler (mehrere Kreise für große Ausschnitte), Route, Stammdaten, Fotos |
 | `js/symbole.js` | Rumpf- und Flugzeug-Umrisse als Distanzfeld-Symbole (einfärbbar, scharf auch stark vergrößert) |
 | `js/infobox.js` | Inhalte der Infobox |
-| `js/live.js` | Live-Blick (Lagesensoren, Kompass mit Missweisung, Kamera, Fähnchen, Hinführen, Abgleich) |
+| `js/live.js` | Live-Blick (Lagesensoren, Kompass mit Missweisung, Kamera, Figuren, Fähnchen, volle Infokarte, Hinführen, Abgleich) |
+| `js/figuren.js` | Figuren für den Live-Blick: 16 Seitenansichten von Schiffen je nach Art, Flugzeug-Umrisse – mit Rand, zwischengespeichert |
 | `js/geo.js` | Entfernung, Richtung, Großkreis, Koppelnavigation, Ost-Nord-Oben, Tag/Nacht-Grenze |
 | `js/texte.js` | Schiffsarten, Fahrtstatus, Flugzeugtypen mit Maßen, Fluggesellschaften, Squawk-Codes |
 | `js/orte.js`, `data/orte.json` | „über der Ostsee“ / „über Deutschland“ |

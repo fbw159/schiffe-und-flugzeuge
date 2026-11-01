@@ -4,10 +4,11 @@ import { SchiffDaten, commonsFoto, haefenLaden, hafen } from "./schiffe.js";
 import { FlugDaten, kreiseFuer } from "./flugzeuge.js";
 import { LiveBlick } from "./live.js";
 import * as IB from "./infobox.js";
-import { $, $$, esc, zahl, melde, speicher, einheiten, tempo, hoehe, weite, richtungKurz } from "./ui.js";
+import { $, $$, esc, zahl, melde, speicher, einheiten, tempo, hoehe, weite } from "./ui.js";
 import { SCHIFF_GRUPPEN, SCHIFF_GRUPPEN_LISTE, faehrt as schiffFaehrt, flugTyp, airline, SQUAWK, HOEHEN_FARBEN, BODEN_FARBE, schiffArt, flagge } from "./texte.js";
 import { mppZoom0, koppeln, KN, entfernung, zielpunkt, grosskreis, RAD, DEG, R } from "./geo.js";
 import { vorschau } from "./symbole.js";
+import { seitenArt } from "./figuren.js";
 import { orteLaden, ortName } from "./orte.js";
 import { missweisung } from "./magvar.js";
 
@@ -419,19 +420,15 @@ function waehle(w) {
   folgen(false);
   const o = objekt();
   if (!o) return;
-  box.innerHTML = w.art === "schiff" ? IB.schiffHtml(o) : IB.flugHtml(o);
   box.hidden = false;
+  infoAufbauen(box, w, false);
   box.classList.remove("eingeklappt");
   box.scrollTop = 0;
   document.body.classList.add("box-offen");
   karte.setWahlZustand(w.art === "schiff" ? "schiffe" : "flug", w.id, true);
   history.replaceState(null, "", w.art === "schiff" ? `#schiff=${w.id}` : `#flug=${w.id}`);
-  infoboxWerte();
   auswahlRing();
   polsterAnpassen();
-  // nachladen
-  if (w.art === "schiff") schiffNachladen(o);
-  else flugNachladen(o);
   spurZeichnen();
   listeBald();
   // ins Bild holen, wenn es verdeckt wäre
@@ -444,68 +441,92 @@ function waehle(w) {
   }, 60);
 }
 
-async function schiffNachladen(s) {
+// ------------------------------------------------------------------ Infobox-Inhalt (Karte und Live-Blick)
+const gleich = (el, id) => el.dataset.id === String(id);
+function infoAufbauen(el, w, live = false) {
+  const o = objekt(w);
+  if (!o) return false;
+  el.dataset.art = w.art;
+  el.dataset.id = String(w.id);
+  el._route = null; el._routeZeit = 0;
+  el.innerHTML = w.art === "schiff" ? IB.schiffHtml(o, { live }) : IB.flugHtml(o, { live });
+  infoWerteIn(el, w);
+  if (w.art === "schiff") schiffNachladen(el, o);
+  else flugNachladen(el, o);
+  return true;
+}
+async function schiffNachladen(el, s) {
   const id = s.mmsi;
   const [d] = await Promise.all([schiffe.details(id), haefenLaden()]);
-  if (!E.wahl || E.wahl.id !== id) return;
-  const ziel = box.querySelector('[data-teil="ziel"]');
+  if (!gleich(el, id)) return;
+  const ziel = el.querySelector('[data-teil="ziel"]');
   if (ziel) ziel.innerHTML = IB.schiffZielHtml(schiffe.schiffe.get(id) || s);
-  const reg = box.querySelector('[data-teil="register"]');
+  const reg = el.querySelector('[data-teil="register"]');
   if (reg) reg.innerHTML = IB.schiffRegisterHtml(d);
-  const ais = box.querySelector('[data-teil="ais"]');
-  if (ais && d) { /* Daten wurden ergänzt */ }
+  const jetzt = schiffe.schiffe.get(id) || s;
+  const ais = el.querySelector('[data-teil="ais"]');
+  if (ais) ais.innerHTML = IB.schiffTabelle(jetzt);
+  const k = IB.schiffKopf(jetzt), kn = el.querySelector('[data-teil="name"]'), ku = el.querySelector('[data-teil="unter"]');
+  if (kn && kn.textContent !== k.name) kn.textContent = k.name;
+  if (ku && ku.textContent !== k.unter) ku.textContent = k.unter;
   const r = d && d.properties && d.properties.particulars;
   if (r && r.image) {
     const foto = await commonsFoto(r.image);
-    if (foto && E.wahl && E.wahl.id === id) fotoSetzen(foto);
+    if (foto && gleich(el, id)) fotoSetzen(el, foto);
   }
+  if (el !== box) return;
   spurZeichnen();
   const v = await schiffe.verlauf(id, 24);
   if (E.wahl && E.wahl.id === id) { E.verlauf = v; spurZeichnen(); }
 }
-async function flugNachladen(f) {
+async function flugNachladen(el, f) {
   const hex = f.hex;
   const [info, foto, route] = await Promise.all([flug.info(hex), flug.foto(hex), flug.route(f.cs, f.lat, f.lon)]);
-  if (!E.wahl || E.wahl.id !== hex) return;
+  if (!gleich(el, hex)) return;
   const o = flug.flieger.get(hex) || f;
-  const ft = box.querySelector('[data-teil="flugzeug"]');
+  const ft = el.querySelector('[data-teil="flugzeug"]');
   if (ft) ft.innerHTML = IB.flugzeugTabelle(o, null, info);
-  E.route = route;
-  const rt = box.querySelector('[data-teil="route"]');
+  el._route = route;
+  const rt = el.querySelector('[data-teil="route"]');
   if (rt) rt.innerHTML = IB.flugRouteHtml(route, o);
-  if (foto) fotoSetzen(foto);
-  else if (info && info.url_photo) fotoSetzen({ bild: info.url_photo_thumbnail || info.url_photo, seite: info.url_photo, urheber: "airport-data.com" });
-  spurZeichnen();
+  if (foto) fotoSetzen(el, foto);
+  else if (info && info.url_photo) fotoSetzen(el, { bild: info.url_photo_thumbnail || info.url_photo, seite: info.url_photo, urheber: "airport-data.com" });
+  if (el === box) { E.route = route; spurZeichnen(); }
 }
-function fotoSetzen(foto) {
-  const el = box.querySelector('[data-teil="foto"]');
-  if (!el) return;
+function fotoSetzen(el, foto) {
+  const f = el.querySelector('[data-teil="foto"]');
+  if (!f) return;
   const html = IB.fotoHtml(foto);
   if (!html) return;
-  el.classList.remove("leer");
-  el.innerHTML = html;
-  polsterAnpassen();
+  f.classList.remove("leer");
+  f.innerHTML = html;
+  if (el === box) polsterAnpassen();
+}
+/** Live-Werte (Tempo, Höhe, Entfernung …) in eine Infobox schreiben; blick = Zusatzzeile im Live-Blick */
+function infoWerteIn(el, w, blick) {
+  const o = objekt(w);
+  if (!o || !gleich(el, w.id)) return;
+  const v = w.art === "schiff" ? IB.schiffWerte(o, E.ich) : IB.flugWerte(o, E.ich);
+  if (blick != null) v.blick = blick;
+  for (const f of el.querySelectorAll("[data-f]")) {
+    const k = f.dataset.f;
+    if (!(k in v)) continue;
+    if (k === "begegnung") { if (f.innerHTML !== v[k]) f.innerHTML = v[k]; }
+    else if (f.textContent !== v[k]) f.textContent = v[k];
+  }
+  const satz = el.querySelector('[data-f="satz"]');
+  if (satz) satz.classList.toggle("notfall", !!v._notfall);
+  if (w.art === "flug" && el._route && Date.now() - (el._routeZeit || 0) > 5000) {
+    el._routeZeit = Date.now();
+    const rt = el.querySelector('[data-teil="route"]');
+    if (rt) rt.innerHTML = IB.flugRouteHtml(el._route, o);
+  }
 }
 
-let routeZeit = 0;
 function infoboxWerte() {
   const o = objekt();
   if (!o || box.hidden) return;
-  const v = E.wahl.art === "schiff" ? IB.schiffWerte(o, E.ich) : IB.flugWerte(o, E.ich);
-  for (const el of box.querySelectorAll("[data-f]")) {
-    const k = el.dataset.f;
-    if (!(k in v)) continue;
-    if (k === "begegnung") { if (el.innerHTML !== v[k]) el.innerHTML = v[k]; }
-    else if (k === "sym") continue;
-    else if (el.textContent !== v[k]) el.textContent = v[k];
-  }
-  const satz = box.querySelector('[data-f="satz"]');
-  if (satz) satz.classList.toggle("notfall", !!v._notfall);
-  if (E.wahl.art === "flug" && E.route && Date.now() - routeZeit > 5000) {
-    routeZeit = Date.now();
-    const rt = box.querySelector('[data-teil="route"]');
-    if (rt) rt.innerHTML = IB.flugRouteHtml(E.route, o);
-  }
+  infoWerteIn(box, E.wahl);
   if (E.folgen) {
     const [lon, lat] = E.wahl.art === "schiff" ? schiffPosition(o, Date.now()) : flugPosition(o, Date.now());
     karte.map.easeTo({ center: [lon, lat], duration: 900, easing: (t) => t });
@@ -546,7 +567,7 @@ box.addEventListener("click", async (ev) => {
   else if (a === "folgen") folgen(!E.folgen);
   else if (a === "spur") { E.spurAn = !E.spurAn; spurZeichnen(); }
   else if (a === "live") liveOeffnen(E.wahl);
-  else if (a === "teilen") teilen();
+  else if (a === "teilen") teilen(E.wahl);
 });
 function folgen(an) {
   E.folgen = an;
@@ -558,11 +579,11 @@ function folgen(an) {
     infoboxWerte();
   }
 }
-async function teilen() {
-  const o = objekt();
+async function teilen(w = E.wahl) {
+  const o = objekt(w);
   if (!o) return;
-  const url = location.href.split("#")[0] + (E.wahl.art === "schiff" ? `#schiff=${E.wahl.id}` : `#flug=${E.wahl.id}`);
-  const titel = E.wahl.art === "schiff" ? IB.schiffName(o) : IB.flugName(o);
+  const url = location.href.split("#")[0] + (w.art === "schiff" ? `#schiff=${w.id}` : `#flug=${w.id}`);
+  const titel = w.art === "schiff" ? IB.schiffName(o) : IB.flugName(o);
   try {
     if (navigator.share) { await navigator.share({ title: titel, text: `${titel} – live verfolgen`, url }); return; }
     await navigator.clipboard.writeText(url);
@@ -1000,7 +1021,9 @@ const live = new LiveBlick({
   missweisung: (lat, lon) => missweisung(lat, lon),
   melde: (t) => melde(t, 6),
   objekte: liveObjekte,
-  infoHtml: liveInfo,
+  infoAufbauen: (el, o) => infoAufbauen(el, { art: o.art, id: o.id }, true),
+  infoWerte: (el, o, blick) => infoWerteIn(el, { art: o.art, id: o.id }, blick),
+  teilen: (o) => teilen({ art: o.art, id: o.id }),
   wechsleModus: () => modusSetzen(E.modus === "schiffe" ? "flugzeuge" : "schiffe", false),
   zeigeAufKarte: (o) => { if (o.art === "schiff") schiffOeffnen(o.id, true); else flugOeffnen(o.id, true); },
   bereichGeaendert: () => liveBereich(),
@@ -1019,7 +1042,7 @@ function liveObjekte(art, ich, weiteM) {
       const hoeheM = s.len ? Math.max(3, Math.min(55, s.len * 0.14)) : 5;
       const faehrt = s.sog > 0.5;
       out.push({
-        id: s.mmsi, art: "schiff", lat, lon, h: hoeheM * 0.6, hoehe: hoeheM, name: IB.schiffName(s), farbe: SCHIFF_GRUPPEN[s.g || "sonst"].farbe,
+        id: s.mmsi, art: "schiff", lat, lon, h: 0, hoehe: hoeheM, laenge: s.len || null, seite: seitenArt(s), hdg: s.hdg, name: IB.schiffName(s), farbe: SCHIFF_GRUPPEN[s.g || "sonst"].farbe,
         symbol: faehrt ? "s-pfeil" : "s-punkt", notfall: s.nav === 14, v: faehrt ? s.sog * KN : 0, kurs: s.cog ?? s.hdg, kurzinfo: faehrt ? tempo(s.sog, true) : (s.len ? `${zahl(s.len)} m` : ""), wichtig: (s.len || 0) / 10,
       });
     }
@@ -1032,30 +1055,12 @@ function liveObjekte(art, ich, weiteM) {
       if (entfernung(ich.lat, ich.lon, lat, lon) > weiteM) continue;
       const h = f.boden ? 2 : f.altGeoFt != null ? f.altGeoFt * 0.3048 : (f.altM || 0);
       out.push({
-        id: f.hex, art: "flug", lat, lon, h, name: IB.flugName(f), farbe: IB.hoehenFarbeJs(f.altM), symbol: "f-" + ty.form,
+        id: f.hex, art: "flug", lat, lon, h, spann: ty.spann, name: IB.flugName(f), farbe: IB.hoehenFarbeJs(f.altM), symbol: "f-" + ty.form,
         v: (f.gs || 0) * KN, kurs: f.trk, notfall: !!(f.notfall || (SQUAWK[f.sq] && SQUAWK[f.sq].notfall)), kurzinfo: f.boden ? "am Boden" : hoehe(f.altM, f.altFt), wichtig: ty.spann / 5 + (f.notfall ? 200 : 0),
       });
     }
   }
   return out;
-}
-function liveInfo(o) {
-  if (o.art === "schiff") {
-    const s = schiffe.schiffe.get(o.id);
-    if (!s) return `<h3>${esc(o.name)}</h3>`;
-    const v = IB.schiffWerte(s, E.ich);
-    return `<h3>${s.flagge ? flagge(s.flagge) + " " : ""}${esc(IB.schiffName(s))}</h3><p>${esc(schiffArt(s.typ, s.kind))}${s.len ? ` · ${zahl(s.len)} m lang` : ""}${s.ziel ? ` · Ziel ${esc(s.ziel)}` : ""}</p>
-      <div class="ib-zahlen"><div class="ib-zahl"><small>Entfernung</small><b>${weite(o._d)}</b><span>${richtungKurz(o._az || 0)}</span></div><div class="ib-zahl"><small>Tempo</small><b>${v.tempo}</b><span>${v.tempo2}</span></div><div class="ib-zahl"><small>Kurs</small><b>${v.kurs}</b><span>${v.kurs2}</span></div><div class="ib-zahl"><small>Sicht</small><b>${o._hinter ? "Horizont" : "frei"}</b><span>${o._hinter ? "evtl. dahinter" : ""}</span></div></div>
-      <p>${esc(v.satz)}</p>`;
-  }
-  const f = flug.flieger.get(o.id);
-  if (!f) return `<h3>${esc(o.name)}</h3>`;
-  const v = IB.flugWerte(f, E.ich);
-  const al = airline(f.cs);
-  const ty = f._ty || flugTyp(f.typ, f.kat, f.desc);
-  return `<h3>${esc(IB.flugName(f))}${al ? ` <small style="color:var(--leise);font-weight:500">${esc(al.name)}</small>` : ""}</h3><p>${esc(ty.name)}${f.reg ? " · " + esc(f.reg) : ""}</p>
-    <div class="ib-zahlen"><div class="ib-zahl"><small>Höhe</small><b>${v.hoehe}</b><span>${v.hoehe2}</span></div><div class="ib-zahl"><small>Entfernung</small><b>${weite(o._d)}</b><span>Luftlinie am Boden</span></div><div class="ib-zahl"><small>Tempo</small><b>${v.tempo}</b><span>${v.tempo2}</span></div><div class="ib-zahl"><small>Blick</small><b>${zahl(o._el || 0)}°</b><span>über dem Horizont</span></div></div>
-    <p>${esc(v.satz)}</p>`;
 }
 function liveBereich() {
   if (!live.offen || !E.ich) return;

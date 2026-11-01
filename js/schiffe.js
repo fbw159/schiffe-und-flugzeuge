@@ -88,10 +88,11 @@ export class SchiffDaten {
     const id = p.mmsi || f.id;
     const alt = this.schiffe.get(id);
     const t = Date.parse(p.seen) || Date.now();
-    if (alt && alt.t > t + 1000) return; // Live-Daten sind neuer
     const s = alt || { mmsi: id, spur: [] };
-    s.lon = f.geometry.coordinates[0]; s.lat = f.geometry.coordinates[1]; s.t = t;
-    s.sog = p.sog ?? null; s.cog = p.cog ?? null; s.hdg = p.heading ?? null; s.nav = p.nav_status ?? null;
+    if (!(alt && alt.t > t + 1000)) { // Position nur, wenn nicht schon neuere Live-Daten da sind
+      s.lon = f.geometry.coordinates[0]; s.lat = f.geometry.coordinates[1]; s.t = t;
+      s.sog = p.sog ?? null; s.cog = p.cog ?? null; s.hdg = p.heading ?? null; s.nav = p.nav_status ?? null;
+    }
     s.name = p.name || s.name || ""; s.typ = p.type ?? s.typ ?? null; s.kind = p.kind || s.kind || "vessel";
     s.len = p.length || s.len || null; s.beam = p.beam || s.beam || null;
     s.tb = p.to_bow ?? s.tb; s.ts = p.to_stern ?? s.ts; s.tp = p.to_port ?? s.tp; s.tsb = p.to_starboard ?? s.tsb;

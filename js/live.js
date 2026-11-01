@@ -1,9 +1,9 @@
 // Live-Blick: Handy auf ein Schiff oder Flugzeug halten – Name und Infos erscheinen genau dort, wo es ist.
 // Lagesensoren + Kompass (mit Missweisung WMM2025), optional Kamerabild. Ohne Sensoren (PC): Umsehen durch Ziehen.
 import { beobachter, azEl, horizont, wrap180, wrap360, RAD, DEG, koppeln, KN, entfernung } from "./geo.js";
-import { speicher, esc, zahl, weite, richtungLang } from "./ui.js";
+import { speicher, esc, zahl, weite, richtungLang, richtungKurz } from "./ui.js";
 import { Etiketten } from "./etiketten.js";
-import { vorschau } from "./symbole.js";
+import { figur, figurBild, SEITE_H } from "./figuren.js";
 
 const SICHTWINKEL = 62, KAMERAWINKEL = 68;
 
@@ -78,9 +78,12 @@ export class LiveBlick {
     document.getElementById("live-info").addEventListener("click", (ev) => {
       const b = ev.target.closest("[data-aktion]");
       if (!b || !this.gewaehlt) return;
-      if (b.dataset.aktion === "hin") { this.setzeZiel(this.gewaehlt); this._infoZu(); }
-      if (b.dataset.aktion === "karte") { const o = this.gewaehlt; this.schliessen(); this.opt.zeigeAufKarte(o); }
-      if (b.dataset.aktion === "zu") this._infoZu();
+      const a = b.dataset.aktion, el = document.getElementById("live-info");
+      if (a === "hin") { this.setzeZiel(this.gewaehlt); el.classList.add("eingeklappt"); el.scrollTop = 0; }
+      else if (a === "karte") { const o = this.gewaehlt; this.schliessen(); this.opt.zeigeAufKarte(o); }
+      else if (a === "zu") this._infoZu();
+      else if (a === "klappen") { el.classList.toggle("eingeklappt"); el.scrollTop = 0; }
+      else if (a === "teilen") this.opt.teilen && this.opt.teilen(this.gewaehlt);
     });
   }
 
@@ -299,23 +302,47 @@ export class LiveBlick {
   _tippen(x, y, r) {
     let best = null, bd = r;
     for (const t of this.treffer || []) {
-      const d = Math.hypot(t.x - x, t.y - y);
+      const d = Math.hypot(t.x - x, t.y - y) - Math.max(0, (t.r || r) - r);
       if (d < bd) { bd = d; best = t.o; }
     }
     if (!best) { this._infoZu(); return; }
     this.gewaehlt = best;
     this._infoNeu();
   }
+  /** Infokarte einmal aufbauen (Foto, Route, Register … wie die Infobox der Karte), danach nur Werte auffrischen */
   _infoNeu() {
     const o = this.gewaehlt;
     const el = document.getElementById("live-info");
-    if (!o) { el.hidden = true; return; }
-    const x = (this._objekte || []).find((k) => k.id === o.id) || o;
-    el.innerHTML = this.opt.infoHtml(x) + `<div class="knopf-reihe"><button class="knopf-gross haupt" data-aktion="hin"><svg><use href="#i-pfeil"/></svg>Hinführen</button><button class="knopf-gross" data-aktion="karte"><svg><use href="#i-karte"/></svg>Auf der Karte</button><button class="knopf-gross" data-aktion="zu" style="flex:0 0 auto;min-width:0"><svg><use href="#i-zu"/></svg></button></div>`;
+    if (!o) { this._infoZu(); return; }
+    const ok = this.opt.infoAufbauen && this.opt.infoAufbauen(el, o);
+    if (!ok) el.innerHTML = `<div class="ib-innen"><div class="ib-kopf"><div class="ib-titel"><h2>${esc(o.name)}</h2><p>Keine weiteren Daten</p></div><div class="kopf-knopfe"><button class="rund klein" data-aktion="zu" aria-label="Schließen"><svg><use href="#i-zu"/></svg></button></div></div></div>`;
     el.hidden = false;
-    this._infoZeit = performance.now();
+    el.classList.remove("eingeklappt");
+    el.scrollTop = 0;
+    document.querySelector(".live-unten").classList.add("info-offen");
+    this._infoWerte();
   }
-  _infoZu() { this.gewaehlt = null; document.getElementById("live-info").hidden = true; }
+  _infoWerte() {
+    const o = this.gewaehlt;
+    if (!o) return;
+    const x = (this._objekte || []).find((k) => k.id === o.id);
+    this.opt.infoWerte && this.opt.infoWerte(document.getElementById("live-info"), o, this._blickText(x));
+  }
+  _blickText(x) {
+    if (!x || x._az == null) return "Gerade außerhalb der Reichweite";
+    const teile = [`Richtung ${Math.round(x._az)}° (${richtungKurz(x._az)})`];
+    teile.push(x._el >= 0 ? `${zahl(x._el, x._el < 10 ? 1 : 0)}° über dem Horizont` : `${zahl(-x._el, 1)}° unter dem Horizont`);
+    if (x.art === "schiff") teile.push(x._hinter ? "vermutlich hinter dem Horizont – evtl. nur die Aufbauten zu sehen" : "in Sichtweite");
+    else teile.push(`${weite(x._d3 || x._d)} Luftlinie`);
+    return teile.join(" · ");
+  }
+  _infoZu() {
+    this.gewaehlt = null;
+    const el = document.getElementById("live-info");
+    el.hidden = true; el.innerHTML = "";
+    const u = document.querySelector(".live-unten");
+    if (u) u.classList.remove("info-offen");
+  }
 
   // ------------------------------------------------------------------ Zeichnen
   _bild() {
@@ -400,7 +427,7 @@ export class LiveBlick {
     this.treffer = [];
     for (const o of roh) {
       const r = azEl(b, o.lat, o.lon, o.h);
-      o._az = r.az; o._el = r.el; o._d = r.boden;
+      o._az = r.az; o._el = r.el; o._d = r.boden; o._d3 = r.d;
       if (r.boden > weiteM) continue;
       if (art === "schiffe") o._hinter = r.boden > horizont(auge, o.hoehe || 10);
       sicht.push(o);
@@ -416,43 +443,70 @@ export class LiveBlick {
     let imBild = 0;
     for (const o of sicht) {
       const p = proj(o._az, o._el);
-      if (!p || p.x < -40 || p.x > w + 40 || p.y < -40 || p.y > h + 40) continue;
+      if (!p || p.x < -120 || p.x > w + 120 || p.y < -80 || p.y > h + 120) continue;
       imBild++;
       const nah = Math.max(0, Math.min(1, 1 - Math.log10(Math.max(o._d, 100) / 100) / Math.log10(weiteM / 100 + 1)));
-      const rad = 4 + 7 * nah;
       const istZiel = this.ziel && this.ziel.id === o.id;
       const istWahl = this.gewaehlt && this.gewaehlt.id === o.id;
-      // Bewegungsrichtung: wo ist es in 20 s (Flugzeug) bzw. 2 min (Schiff)?
+      // Bewegung: wo ist es in 20 s (Flugzeug) bzw. 2 min (Schiff)? → Strich und Flugrichtung des Symbols
+      let bewegung = null;
       if (o.v > 0.5 && o.kurs != null) {
         const t = art === "schiffe" ? 120 : 20;
         const [lo2, la2] = koppeln(o.lat, o.lon, o.v, o.kurs, t);
         const r2 = azEl(b, la2, lo2, o.h);
         const p2 = proj(r2.az, r2.el);
-        if (p2) {
-          const dx = p2.x - p.x, dy = p2.y - p.y, l = Math.hypot(dx, dy);
-          if (l > 2) {
-            const k = Math.min(l, 60) / l;
-            g.strokeStyle = o.farbe; g.lineWidth = 2; g.globalAlpha = 0.8;
-            g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(p.x + dx * k, p.y + dy * k); g.stroke(); g.globalAlpha = 1;
-          }
-        }
+        if (p2) { const dx = p2.x - p.x, dy = p2.y - p.y, l = Math.hypot(dx, dy); if (l > 1.5) bewegung = { dx, dy, l }; }
       }
-      g.globalAlpha = o._hinter ? 0.55 : 1;
-      if (o.notfall) { g.fillStyle = "rgba(255,50,50,0.35)"; g.beginPath(); g.arc(p.x, p.y, rad + 7 + 3 * Math.sin(jetzt / 200), 0, Math.PI * 2); g.fill(); }
-      g.fillStyle = o.farbe; g.strokeStyle = "rgba(0,0,0,0.75)"; g.lineWidth = 2;
-      g.beginPath(); g.arc(p.x, p.y, rad, 0, Math.PI * 2); g.fill(); g.stroke();
-      if (o._hinter) { g.setLineDash([3, 3]); g.strokeStyle = "#fff"; g.lineWidth = 1; g.beginPath(); g.arc(p.x, p.y, rad + 3, 0, Math.PI * 2); g.stroke(); g.setLineDash([]); }
-      if (istZiel || istWahl) {
-        g.strokeStyle = istZiel ? "#6fe39a" : "#fff"; g.lineWidth = 2.5;
-        g.beginPath(); g.arc(p.x, p.y, rad + 8, 0, Math.PI * 2); g.stroke();
-      }
-      g.globalAlpha = 1;
-      this.treffer.push({ x: p.x, y: p.y, o });
       const name = o.name;
       const zusatz = volleSchrift ? `${weite(o._d)}${o.kurzinfo ? " · " + o.kurzinfo : ""}` : "";
       const prio = (istZiel ? 1000 : 0) + (istWahl ? 500 : 0) + nah * 100 + (o.wichtig || 0);
-      if (art === "schiffe") faehnchen.push({ name, zusatz, x: p.x, y: p.y - rad, prio: prio + (o.notfall ? 800 : 0), ziel: istZiel, wahl: istWahl, farbe: o.farbe, notfall: o.notfall, o });
-      else et.dazu(name + (zusatz ? " · " + zusatz : ""), p.x, p.y, rad + 2, istZiel ? "#b6ffcf" : "#ffffff", `${nah > 0.5 ? 700 : 600} ${Math.round(11.5 + 3 * nah)}px system-ui, sans-serif`, prio, istZiel || istWahl);
+      g.globalAlpha = o._hinter ? 0.55 : 1;
+      if (art === "schiffe") {
+        // Seitenansicht je nach Art, Bug in Fahrtrichtung, Größe nach echter Länge und Entfernung
+        const kurs = o.kurs ?? o.hdg;
+        let rechts = true, fore = 0.85;
+        if (kurs != null) { const rel = wrap180(kurs - o._az); rechts = rel >= 0; fore = 0.5 + 0.5 * Math.abs(Math.sin(rel * RAD)); }
+        const echt = F * (o.laenge || 25) / Math.max(o._d, 60) * fore;
+        const lpx = Math.max(34 + 20 * nah, Math.min(190, echt));
+        const fig = figur("seite-" + (o.seite || "sonst"), o.farbe, lpx);
+        const oberkante = p.y - fig.innenH * (19 / SEITE_H);
+        if (bewegung) {
+          const k = Math.min(bewegung.l, 50) / bewegung.l;
+          g.strokeStyle = o.farbe; g.lineWidth = 2; g.globalAlpha *= 0.8;
+          g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(p.x + bewegung.dx * k, p.y + bewegung.dy * k); g.stroke();
+          g.globalAlpha = o._hinter ? 0.55 : 1;
+        }
+        if (o.notfall) { g.fillStyle = "rgba(255,50,50,0.35)"; g.beginPath(); g.ellipse(p.x, p.y - fig.innenH * 0.35, lpx * 0.6 + 4 * Math.sin(jetzt / 200), fig.innenH * 0.8, 0, 0, Math.PI * 2); g.fill(); }
+        g.save(); g.translate(p.x, 0); if (!rechts) g.scale(-1, 1);
+        g.drawImage(fig, -fig.w / 2, oberkante - fig.pad, fig.w, fig.h);
+        g.restore();
+        if (istZiel || istWahl) {
+          g.strokeStyle = istZiel ? "#6fe39a" : "#fff"; g.lineWidth = 2.5;
+          const rr = 6, x0 = p.x - lpx / 2 - 6, y0 = oberkante - 6, bw = lpx + 12, bh = fig.innenH + 10;
+          g.beginPath(); g.moveTo(x0 + rr, y0); g.arcTo(x0 + bw, y0, x0 + bw, y0 + bh, rr); g.arcTo(x0 + bw, y0 + bh, x0, y0 + bh, rr); g.arcTo(x0, y0 + bh, x0, y0, rr); g.arcTo(x0, y0, x0 + bw, y0, rr); g.stroke();
+        }
+        g.globalAlpha = 1;
+        this.treffer.push({ x: p.x, y: oberkante + fig.innenH / 2, o, r: Math.max(26, lpx / 2 + 6) });
+        if (p.x > 0 && p.x < w) faehnchen.push({ name, zusatz, x: p.x, y: oberkante - 2, prio: prio + (o.notfall ? 800 : 0), ziel: istZiel, wahl: istWahl, farbe: o.farbe, notfall: o.notfall, o });
+      } else {
+        // Flugzeug-Umriss, Nase in Flugrichtung auf dem Bildschirm, Größe nach Spannweite und Entfernung
+        if (bewegung) o._dreh = Math.atan2(bewegung.dy, bewegung.dx) + Math.PI / 2;
+        const echt = F * (o.spann || 30) / Math.max(o._d3 || o._d, 80);
+        const px = Math.max(26 + 20 * nah, Math.min(130, echt));
+        const fig = figur(o.symbol || "f-jet2", o.farbe, px);
+        if (bewegung) {
+          const k = Math.min(bewegung.l, 70) / bewegung.l;
+          g.strokeStyle = o.farbe; g.lineWidth = 1.5; g.globalAlpha = 0.55; g.setLineDash([4, 4]);
+          g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(p.x + bewegung.dx * k, p.y + bewegung.dy * k); g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+        }
+        if (o.notfall) { g.fillStyle = "rgba(255,50,50,0.38)"; g.beginPath(); g.arc(p.x, p.y, px * 0.6 + 4 * Math.sin(jetzt / 200), 0, Math.PI * 2); g.fill(); }
+        g.save(); g.translate(p.x, p.y); g.rotate(o._dreh || 0);
+        g.drawImage(fig, -fig.w / 2, -fig.h / 2, fig.w, fig.h);
+        g.restore();
+        if (istZiel || istWahl) { g.strokeStyle = istZiel ? "#6fe39a" : "#fff"; g.lineWidth = 2.5; g.beginPath(); g.arc(p.x, p.y, px * 0.62 + 4, 0, Math.PI * 2); g.stroke(); }
+        this.treffer.push({ x: p.x, y: p.y, o, r: Math.max(26, px * 0.6) });
+        if (p.x > 0 && p.x < w) et.dazu(name + (zusatz ? " · " + zusatz : ""), p.x, p.y, px * 0.5, istZiel ? "#b6ffcf" : "#ffffff", `${nah > 0.5 ? 700 : 600} ${Math.round(11.5 + 3 * nah)}px system-ui, sans-serif`, prio, istZiel || istWahl);
+      }
     }
     et.zeichne();
     this._faehnchen(g, faehnchen, w, h, oben, untenH);
@@ -485,9 +539,9 @@ export class LiveBlick {
       const nach = [...sicht].sort((a, b2) => a._d - b2._d).slice(0, 16);
       const el = document.getElementById("live-chips");
       el.innerHTML = nach.length
-        ? nach.map((o) => `<button class="live-chip" data-id="${esc(o.id)}" aria-pressed="${this.ziel && this.ziel.id === o.id}"><img alt="" src="${vorschau(o.symbol, o.farbe, 22, 0)}">${esc(o.name)} <small>${weite(o._d)}</small></button>`).join("")
+        ? nach.map((o) => `<button class="live-chip" data-id="${esc(o.id)}" aria-pressed="${this.ziel && this.ziel.id === o.id}"><img alt="" src="${figurBild(art === "schiffe" ? "seite-" + (o.seite || "sonst") : o.symbol, o.farbe, art === "schiffe" ? 34 : 24)}">${esc(o.name)} <small>${weite(o._d)}</small></button>`).join("")
         : `<span class="live-chip"><small>${ich ? `Keine ${wort[1]} im Umkreis von ${zahl(this.weite[art])} km – Reichweite unten vergrößern.` : "Standort fehlt."}</small></span>`;
-      if (this.gewaehlt && performance.now() - (this._infoZeit || 0) > 1000) this._infoNeu();
+      if (this.gewaehlt) this._infoWerte();
     }
   }
 

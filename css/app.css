@@ -281,6 +281,8 @@ body[data-modus="schiffe"] .filter button[aria-pressed="true"] { color: #00121f;
 .ib-innen { padding: 12px 14px 14px; }
 .ib-kopf { display: flex; align-items: flex-start; gap: 10px; }
 .ib-kopf img.sym { width: 40px; height: 40px; flex: none; margin-top: 2px; }
+.ib-kopf img.sym.seite { width: 60px; height: auto; margin-top: 6px; }
+.ib-blick { margin: -2px 0 8px; font-size: 13px; color: #9fd8ff; }
 .ib-titel { flex: 1; min-width: 0; }
 .ib-titel h2 { margin: 0; font-size: 19px; line-height: 1.2; word-break: break-word; }
 .ib-titel p { margin: 2px 0 0; font-size: 13px; color: var(--leise); }
@@ -294,7 +296,8 @@ body[data-modus="schiffe"] .filter button[aria-pressed="true"] { color: #00121f;
 .ib-zahlen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 12px 0 10px; }
 .ib-zahl { padding: 7px 8px; border-radius: 12px; background: var(--flaeche-2); min-width: 0; }
 .ib-zahl small { display: block; font-size: 10.5px; color: var(--leise); text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; }
-.ib-zahl b { display: block; font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ib-zahl b { display: block; font-size: 15.5px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.2px; }
+@media (max-width: 420px) { .ib-zahl { padding: 6px 6px; } .ib-zahl b { font-size: 14px; } .ib-zahlen { gap: 5px; } }
 .ib-zahl span { display: block; font-size: 11px; color: var(--leise); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 380px) { .ib-zahlen { grid-template-columns: repeat(2, 1fr); } }
 .ib-satz { margin: 0 0 10px; font-size: 14px; color: #dbe3f2; }
@@ -387,7 +390,6 @@ body[data-modus="flugzeuge"] .knopf-gross.haupt { color: #fff; }
   flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px 6px 7px; border-radius: 16px;
   background: rgba(12, 17, 30, .86); border: 1px solid rgba(160, 185, 235, .35); font-size: 13px; font-weight: 650; white-space: nowrap;
 }
-.live-chip img { width: 22px; height: 22px; }
 .live-chip small { color: var(--leise); font-weight: 500; }
 .live-chip[aria-pressed="true"] { border-color: #6fe39a; background: rgba(20, 90, 50, .85); }
 .live-reichweite { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: #c9d2e5; text-shadow: 0 1px 2px #000; }
@@ -399,10 +401,11 @@ body[data-modus="flugzeuge"] .knopf-gross.haupt { color: #fff; }
 }
 .live-pfeil.ziel { background: rgba(30, 140, 70, .9); border-color: #6fe39a; }
 .live-info {
-  padding: 12px 14px; border-radius: 16px; background: rgba(10, 14, 26, .95); border: 1px solid var(--linie);
-  max-height: 45dvh; overflow-y: auto; font-size: 14px;
+  border-radius: 18px; background: rgba(10, 14, 26, .97); border: 1px solid rgba(160, 185, 235, .3); box-shadow: 0 10px 34px rgba(0, 0, 0, .6);
+  max-height: 64dvh; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; font-size: 14px; animation: box-auf .22s ease-out;
 }
-.live-info h3 { margin: 0; font-size: 17px; }
-.live-info p { margin: 2px 0 8px; color: var(--leise); font-size: 13px; }
-.live-info .ib-zahlen { margin: 8px 0; }
-.live-info .knopf-reihe { margin-bottom: 0; }
+.live-info .ib-foto { height: 140px; }
+.live-info.eingeklappt .ib-foto, .live-info.eingeklappt .ib-rest, .live-info.eingeklappt .ib-satz { display: none; }
+.live-info.eingeklappt .knopf-klappen svg { transform: rotate(180deg); }
+.live-unten.info-offen .live-chips, .live-unten.info-offen .live-reichweite { display: none; }
+.live-chip img { width: auto; height: 22px; max-width: 40px; }

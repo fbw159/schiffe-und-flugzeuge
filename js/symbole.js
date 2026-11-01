@@ -177,6 +177,9 @@ export function sdfBild(name) {
 
 export const BILD_PR = PR;
 
+/** Umriss eines Symbols in einen Canvas-Kontext zeichnen (logische Einheiten, Füllfarbe vorher setzen) */
+export function symbolPfad(name, g) { zeichnen(name, g); }
+
 /** Alle Symbole in die Karte laden */
 export function symboleLaden(map) {
   for (const name of Object.keys(MASS)) {

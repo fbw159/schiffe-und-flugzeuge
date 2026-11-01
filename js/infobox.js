@@ -3,12 +3,14 @@ import { esc, zahl, tempo, hoehe, weite, richtungKurz, richtungNach, seit, uhr, 
 import { schiffArt, fahrtStatus, faehrt as schiffFaehrt, land, flagge, groessenVergleich, SCHIFF_GRUPPEN, flugTyp, airline, TYP_WISSEN, KATEGORIE_TEXT, SQUAWK, EMERGENCY, HOEHEN_FARBEN, BODEN_FARBE } from "./texte.js";
 import { entfernung, richtung, naechsteAnnaeherung, KN } from "./geo.js";
 import { vorschau } from "./symbole.js";
+import { figurBild, seitenArt } from "./figuren.js";
 import { ortName } from "./orte.js";
 import { hafen } from "./schiffe.js";
 import { fortschritt } from "./flugzeuge.js";
 
 const zeile = (k, v) => (v == null || v === "" ? "" : `<tr><td>${esc(k)}</td><td>${v}</td></tr>`);
 const knopf = (aktion, icon, text, gedrueckt) => `<button class="knopf-gross" data-aktion="${aktion}"${gedrueckt != null ? ` aria-pressed="${gedrueckt}"` : ""}><svg><use href="#i-${icon}"/></svg>${text}</button>`;
+const liveKnoepfe = `<button class="knopf-gross haupt" data-aktion="hin"><svg><use href="#i-pfeil"/></svg>Hinführen</button><button class="knopf-gross" data-aktion="karte"><svg><use href="#i-karte"/></svg>Auf der Karte</button><button class="knopf-gross" data-aktion="teilen"><svg><use href="#i-teilen"/></svg>Teilen</button>`;
 const kopfKnoepfe = `<div class="kopf-knopfe"><button class="rund klein knopf-klappen" data-aktion="klappen" title="Ein-/ausklappen" aria-label="Ein- oder ausklappen"><svg><use href="#i-klappen"/></svg></button><button class="rund klein" data-aktion="zu" title="Schließen" aria-label="Schließen"><svg><use href="#i-zu"/></svg></button></div>`;
 
 export function hoehenFarbeJs(m) {
@@ -66,15 +68,19 @@ function rumpfSkizze(s) {
     <text x="${x0 + l + 4}" y="${y0 + b / 2 + 3}" font-size="10" fill="#cdd5e6">${zahl(B)} m</text></svg>`;
 }
 
-export function schiffHtml(s) {
+/** Kopfzeile neu (wenn Name/Art erst später bekannt werden) */
+export function schiffKopf(s) {
+  return { name: schiffName(s), unter: (s.flagge ? `${flagge(s.flagge)} ${land(s.flagge)} · ` : "") + schiffArt(s.typ, s.kind) };
+}
+export function schiffHtml(s, opt = {}) {
   const g = SCHIFF_GRUPPEN[s.g || "sonst"];
   const fl = s.flagge ? `${flagge(s.flagge)} ${esc(land(s.flagge))} · ` : "";
   return `
   <div class="ib-foto leer" data-teil="foto"></div>
   <div class="ib-innen">
     <div class="ib-kopf">
-      <img class="sym" alt="" src="${vorschau(s.len > 0 ? "s-rumpf" : schiffSymbol(s), g.farbe, 40, 0)}">
-      <div class="ib-titel"><h2>${esc(schiffName(s))}</h2><p>${fl}${esc(schiffArt(s.typ, s.kind))}</p></div>
+      <img class="sym seite" alt="" src="${figurBild("seite-" + seitenArt(s), g.farbe, 60)}">
+      <div class="ib-titel"><h2 data-teil="name">${esc(schiffName(s))}</h2><p data-teil="unter">${fl}${esc(schiffArt(s.typ, s.kind))}</p></div>
       ${kopfKnoepfe}
     </div>
     <div class="ib-zahlen">
@@ -83,10 +89,10 @@ export function schiffHtml(s) {
       <div class="ib-zahl"><small>Länge</small><b>${s.len ? zahl(s.len) + " m" : "–"}</b><span>${s.beam ? "Breite " + zahl(s.beam) + " m" : ""}</span></div>
       <div class="ib-zahl"><small>Von dir</small><b data-f="dist">–</b><span data-f="dist2"></span></div>
     </div>
-    <p class="ib-satz" data-f="satz"></p>
+    ${opt.live ? '<p class="ib-blick" data-f="blick"></p>' : ""}<p class="ib-satz" data-f="satz"></p>
     <div class="ib-rest">
       <div data-teil="ziel"></div>
-      <div class="knopf-reihe">${knopf("folgen", "folgen", "Folgen", false)}${knopf("spur", "spur", "Fahrtweg", false)}${knopf("live", "live", "Live-Blick")}${knopf("teilen", "teilen", "Teilen")}</div>
+      <div class="knopf-reihe">${opt.live ? liveKnoepfe : knopf("folgen", "folgen", "Folgen", false) + knopf("spur", "spur", "Fahrtweg", false) + knopf("live", "live", "Live-Blick") + knopf("teilen", "teilen", "Teilen")}</div>
       <div data-f="begegnung"></div>
       ${s.len ? `<div class="abschnitt">Größe</div><div class="masse">${rumpfSkizze(s)}</div><p class="hinweis-klein">${esc(groessenVergleich(s.len))}${s.tief ? ` · Tiefgang ${zahl(s.tief, 1)} m` : ""}</p>` : ""}
       <div data-teil="register"><p class="lade-zeile">Schiffsregister wird geladen …</p></div>
@@ -101,7 +107,7 @@ export function schiffHtml(s) {
   </div>`;
 }
 
-function schiffTabelle(s) {
+export function schiffTabelle(s) {
   return zeile("Art", esc(schiffArt(s.typ, s.kind)) + (s.typ != null ? ` <small>(Code ${s.typ})</small>` : "")) +
     zeile("Status", esc(fahrtStatus(s.nav) || "keine Angabe")) +
     zeile("MMSI", String(s.mmsi)) + zeile("IMO", s.imo ? String(s.imo) : "") + zeile("Rufzeichen", esc(s.ruf || "")) +
@@ -216,7 +222,7 @@ export function flugSatz(f, ich) {
   return { text: teile.join(" · "), notfall: false };
 }
 
-export function flugHtml(f) {
+export function flugHtml(f, opt = {}) {
   const ty = flugTyp(f.typ, f.kat, f.desc);
   const al = airline(f.cs);
   const titel = esc(flugName(f)) + (al ? ` <small style="font-weight:500;color:var(--leise)">${esc(al.name)}</small>` : "");
@@ -234,10 +240,10 @@ export function flugHtml(f) {
       <div class="ib-zahl"><small>Steigen</small><b data-f="vr">–</b><span data-f="vr2"></span></div>
       <div class="ib-zahl"><small>Von dir</small><b data-f="dist">–</b><span data-f="dist2"></span></div>
     </div>
-    <p class="ib-satz" data-f="satz"></p>
+    ${opt.live ? '<p class="ib-blick" data-f="blick"></p>' : ""}<p class="ib-satz" data-f="satz"></p>
     <div class="ib-rest">
       <div data-teil="route"><p class="lade-zeile">Route wird gesucht …</p></div>
-      <div class="knopf-reihe">${knopf("folgen", "folgen", "Folgen", false)}${knopf("spur", "spur", "Flugweg", false)}${knopf("live", "live", "Live-Blick")}${knopf("teilen", "teilen", "Teilen")}</div>
+      <div class="knopf-reihe">${opt.live ? liveKnoepfe : knopf("folgen", "folgen", "Folgen", false) + knopf("spur", "spur", "Flugweg", false) + knopf("live", "live", "Live-Blick") + knopf("teilen", "teilen", "Teilen")}</div>
       ${TYP_WISSEN[f.typ] ? `<div class="wissen">${esc(TYP_WISSEN[f.typ])}</div>` : ""}
       <div class="abschnitt">Flugzeug</div>
       <table class="tabelle"><tbody data-teil="flugzeug">${flugzeugTabelle(f, ty, null)}</tbody></table>
