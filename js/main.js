@@ -1,5 +1,5 @@
 // Schiffe & Flugzeuge live – Ablauf: Modus, Standort, Daten, Karte, Liste, Infobox, Live-Blick
-import { Karte, zoomFaktorSchiff, MASS, ml } from "./karte.js";
+import { Karte, zoomFaktorSchiff, figZoom, MASS, ml } from "./karte.js";
 import { SchiffDaten, commonsFoto, haefenLaden, hafen } from "./schiffe.js";
 import { FlugDaten, kreiseFuer } from "./flugzeuge.js";
 import { LiveBlick } from "./live.js";
@@ -8,13 +8,14 @@ import { $, $$, esc, zahl, melde, speicher, einheiten, tempo, hoehe, weite } fro
 import { SCHIFF_GRUPPEN, SCHIFF_GRUPPEN_LISTE, faehrt as schiffFaehrt, flugTyp, airline, SQUAWK, HOEHEN_FARBEN, BODEN_FARBE, schiffArt, flagge } from "./texte.js";
 import { mppZoom0, koppeln, KN, entfernung, zielpunkt, grosskreis, RAD, DEG, R } from "./geo.js";
 import { vorschau } from "./symbole.js";
-import { seitenArt } from "./figuren.js";
+import { seitenArt, figurBild } from "./figuren.js";
+const GRUPPEN_FIGUR = { fracht: "fracht", tanker: "tanker", passagier: "faehre", schnell: "schnell", fischerei: "fischer", dienst: "schlepper", sport: "segel", behoerde: "behoerde", sonst: "sonst" };
 import { orteLaden, ortName } from "./orte.js";
 import { missweisung } from "./magvar.js";
 
 const RELAY_STANDARD = "https://schiffe-flugzeuge.fbw159.workers.dev";
 const PC = window.matchMedia("(min-width: 900px)");
-const STANDARD = { modus: "schiffe", grund: "karte", seezeichen: true, nacht: true, tempo: "beides", hoehe: "m", auge: 1.7, beschriftung: "voll", relay: RELAY_STANDARD, gruppenAus: [], flugAus: [], nurFahrend: false, ohneKlein: false };
+const STANDARD = { modus: "schiffe", grund: "karte", figuren: true, nacht: true, tempo: "beides", hoehe: "m", auge: 1.7, beschriftung: "voll", relay: RELAY_STANDARD, gruppenAus: [], flugAus: [], nurFahrend: false, ohneKlein: false };
 
 const E = {
   einst: { ...STANDARD, ...(speicher.lies("sf.einst", {}) || {}) },
@@ -94,7 +95,6 @@ async function start() {
     return;
   }
   karte.setGrund(E.einst.grund);
-  karte.setSeezeichen(E.einst.seezeichen);
   karte.map.setLayoutProperty("nacht-0", "visibility", E.einst.nacht ? "visible" : "none");
   for (const i of [1, 2]) karte.map.setLayoutProperty("nacht-" + i, "visibility", E.einst.nacht ? "visible" : "none");
   filterAnwenden();
@@ -198,7 +198,7 @@ function bereichAktualisieren() {
     E.schiffUebersicht = !einzeln;
     karte.setSchiffAnsicht(!einzeln);
     schiffe.setBereich(box, einzeln);
-    if (!einzeln) { karte.setDaten("schiffe", []); hinweis(karte.zoom < 5.2 ? "" : "Zoome etwas näher heran für Namen, Größe und Live-Bewegung."); }
+    if (!einzeln) { karte.setDaten("schiffe", []); karte.setDaten("kurs", []); hinweis(karte.zoom < 5.2 ? "" : "Zoome etwas näher heran für Namen, Größe und Live-Bewegung."); }
     else hinweis("");
     if (einzeln) schiffeZeichnen();
   } else {
@@ -273,8 +273,17 @@ function schiffFeature(s, z, jetzt) {
   const echtPx = len ? len / (mpp0 / 2 ** z) : 0;
   const smin = len ? (len < 15 ? 0.72 : len < 50 ? 0.86 : len < 150 ? 1.04 : len < 250 ? 1.24 : 1.42) : 0.8;
   const zeigerPx = MASS["s-pfeil"].h * smin * zoomFaktorSchiff(z);
-  let ic, s0 = 0, sm = smin;
-  if (len && echtPx >= zeigerPx * 0.9) {
+  let ic, s0 = 0, sm = smin, art = "pfeil";
+  const figSkala = len ? (len < 15 ? 0.42 : len < 50 ? 0.55 : len < 150 ? 0.72 : len < 250 ? 0.88 : 1) : 0.55;
+  const figPx = 64 * figSkala * figZoom(z);
+  const rumpf = len && echtPx >= (E.einst.figuren ? figPx * 0.8 : zeigerPx * 0.9);
+  if (E.einst.figuren && !rumpf) {
+    const k = faehrt ? (s.cog ?? s.hdg) : (s.hdg ?? s.cog);
+    const rechts = k == null || Math.sin(k * RAD) >= -0.02;
+    art = "fig";
+    ic = `fig-${seitenArt(s)}-${s.g || "sonst"}-${rechts ? "r" : "l"}`;
+    sm = figSkala;
+  } else if (rumpf) {
     const breit = s.beam && s.beam / len > 0.24;
     ic = breit ? "s-rumpf-breit" : "s-rumpf";
     s0 = len / (mpp0 * MASS[ic].h);
@@ -286,10 +295,11 @@ function schiffFeature(s, z, jetzt) {
       lat += dn / R * DEG; lon += de / (R * Math.cos(lat * RAD)) * DEG;
     }
   } else ic = faehrt ? "s-pfeil" : "s-punkt";
+  if (rumpf) art = "rumpf";
   const alt = jetzt - s.t > (faehrt ? 15 * 60000 : 3 * 86400000) ? 1 : 0;
   return {
     type: "Feature", id: s.mmsi,
-    properties: { id: s.mmsi, ic, rot: faehrt || s.hdg != null ? rot : 0, s0, smin: sm, g: s.g || "sonst", sk: -(len || 8), name: s.name || "", alt, nf: s.nav === 14 ? 1 : 0 },
+    properties: { id: s.mmsi, ic, art, rot: faehrt || s.hdg != null ? rot : 0, s0, smin: sm, g: s.g || "sonst", sk: art === "fig" ? -lat * 1000 : -(len || 8), name: s.name || "", alt, nf: s.nav === 14 ? 1 : 0 },
     geometry: { type: "Point", coordinates: [lon, lat] },
   };
 }
@@ -303,13 +313,23 @@ function schiffeZeichnen() {
   if (!karte.bereit || E.modus !== "schiffe") return;
   if (E.schiffUebersicht && !live.offen) return;
   const jetzt = Date.now(), z = karte.zoom, b = sichtBox();
-  const fs = [];
+  const fs = [], kurs = [];
   for (const s of schiffe.schiffe.values()) {
     if (s.lat == null || !inBox(b, s.lat, s.lon)) continue;
     if (!schiffSichtbar(s) && !(E.wahl && E.wahl.id === s.mmsi)) continue;
-    fs.push(schiffFeature(s, z, jetzt));
+    const f = schiffFeature(s, z, jetzt);
+    fs.push(f);
+    // Fahrtrichtung als Strich (Weg der nächsten 3 Minuten), nur bei Figuren
+    if (f.properties.art === "fig" && schiffFaehrt(s) && (s.cog ?? s.hdg) != null) {
+      // Länge: Weg in 3 Minuten, auf dem Bildschirm aber etwa so lang wie die Figur (mind.) und höchstens 130 Pixel
+      const [lo, la] = f.geometry.coordinates;
+      const mpp = mppZoom0(la) / 2 ** z;
+      const weg = Math.min(130 * mpp, Math.max(40 * figZoom(z) * mpp, Math.max(s.sog, 3) * KN * 180));
+      kurs.push({ type: "Feature", properties: { g: s.g || "sonst" }, geometry: { type: "LineString", coordinates: [[lo, la], koppeln(la, lo, weg, s.cog ?? s.hdg, 1)] } });
+    }
   }
   karte.setDaten("schiffe", fs);
+  karte.setDaten("kurs", kurs);
   if (E.wahl && E.wahl.art === "schiff") { karte.setWahlZustand("schiffe", E.wahl.id, true); auswahlRing(); }
 }
 
@@ -377,7 +397,7 @@ function flugTakt() {
 // ------------------------------------------------------------------ Auswahl
 function wahlAusKarte(f) {
   const l = f.layer.id;
-  if (l === "schiffe") schiffOeffnen(f.properties.id, false);
+  if (l === "schiffe" || l === "schiffe-fig") schiffOeffnen(f.properties.id, false);
   else if (l === "schiffe-uebersicht") {
     const id = Number(f.properties.mmsi);
     if (id) schiffOeffnen(id, true, f.geometry.coordinates);
@@ -539,8 +559,14 @@ function infoboxWerte() {
 function auswahlRing() {
   const o = objekt();
   if (!o) { karte.setAuswahl(null); return; }
-  const [lon, lat] = E.wahl.art === "schiff" ? schiffPosition(o, Date.now()) : flugPosition(o, Date.now());
-  karte.setAuswahl([lon, lat], E.wahl.art === "schiff" ? 18 : 22);
+  const jetzt = Date.now();
+  if (E.wahl.art === "schiff") {
+    const f = schiffFeature(o, karte.zoom, jetzt);
+    if (f.properties.art === "fig") {
+      // Figur steht auf ihrem Ort: Ring um die ganze Figur legen
+      karte.setAuswahl(f.geometry.coordinates, 18, f.properties.smin);
+    } else karte.setAuswahl(schiffPosition(o, jetzt), 18);
+  } else karte.setAuswahl(flugPosition(o, jetzt), 22);
 }
 
 function infoboxZu() {
@@ -724,7 +750,7 @@ function schiffZeile(s, gew) {
   const faehrt = s.sog > 0.5;
   const unter = [schiffArt(s.typ, s.kind), faehrt ? tempo(s.sog, true) : "liegt", s.ziel ? "→ " + s.ziel : ""].filter(Boolean).join(" · ");
   const nf = s.nav === 14 ? '<span class="etikett rot">Notsignal</span>' : "";
-  return `<li data-art="schiff" data-id="${s.mmsi}" class="${gew === s.mmsi ? "gewaehlt" : ""}"><img alt="" src="${vorschau(faehrt ? "s-pfeil" : "s-punkt", g.farbe, 30, faehrt ? s.cog || 0 : 0)}"><span class="name">${s.flagge ? flagge(s.flagge) + " " : ""}${esc(IB.schiffName(s))}${nf}</span><span class="unter">${esc(unter)}</span><span class="wert"><b>${s.len ? zahl(s.len) + " m" : "–"}</b>${weite(s._d)}</span></li>`;
+  return `<li data-art="schiff" data-id="${s.mmsi}" class="${gew === s.mmsi ? "gewaehlt" : ""}"><img class="fig" alt="" src="${figurBild("seite-" + seitenArt(s), g.farbe, 40)}"><span class="name">${s.flagge ? flagge(s.flagge) + " " : ""}${esc(IB.schiffName(s))}${nf}</span><span class="unter">${esc(unter)}</span><span class="wert"><b>${s.len ? zahl(s.len) + " m" : "–"}</b>${weite(s._d)}</span></li>`;
 }
 function flugZeile(f, gew) {
   const ty = f._ty || flugTyp(f.typ, f.kat, f.desc);
@@ -882,7 +908,7 @@ function filterAnwenden() {
 function filterZeichnen() {
   const el = $("#filter-inhalt");
   if (E.modus === "schiffe") {
-    el.innerHTML = `<div class="filter-gruppe"><h3>Welche Schiffe?</h3>${SCHIFF_GRUPPEN_LISTE.map((g) => `<div class="filter-zeile"><img alt="" src="${vorschau("s-pfeil", SCHIFF_GRUPPEN[g].farbe, 24, 45)}"><span>${esc(SCHIFF_GRUPPEN[g].name)}</span><label class="schalter"><input type="checkbox" data-gruppe="${g}" ${E.einst.gruppenAus.includes(g) ? "" : "checked"}><span></span></label></div>`).join("")}</div>
+    el.innerHTML = `<div class="filter-gruppe"><h3>Welche Schiffe?</h3>${SCHIFF_GRUPPEN_LISTE.map((g) => `<div class="filter-zeile"><img class="fig" alt="" src="${figurBild("seite-" + GRUPPEN_FIGUR[g], SCHIFF_GRUPPEN[g].farbe, 40)}"><span>${esc(SCHIFF_GRUPPEN[g].name)}</span><label class="schalter"><input type="checkbox" data-gruppe="${g}" ${E.einst.gruppenAus.includes(g) ? "" : "checked"}><span></span></label></div>`).join("")}</div>
       <div class="filter-gruppe"><h3>Außerdem</h3>
       <div class="filter-zeile"><span>Nur fahrende Schiffe</span><label class="schalter"><input type="checkbox" data-opt="nurFahrend" ${E.einst.nurFahrend ? "checked" : ""}><span></span></label></div>
       <div class="filter-zeile"><span>Kleine Boote unter 20 m ausblenden</span><label class="schalter"><input type="checkbox" data-opt="ohneKlein" ${E.einst.ohneKlein ? "checked" : ""}><span></span></label></div></div>
@@ -964,14 +990,14 @@ $("#knopf-ebenen").onclick = () => {
   m.hidden = !m.hidden;
   $("#knopf-ebenen").setAttribute("aria-expanded", String(!m.hidden));
   for (const b of $$("#ebenen-menue [data-grund]")) b.setAttribute("aria-pressed", String(b.dataset.grund === E.einst.grund));
-  $("#schalter-seezeichen").checked = E.einst.seezeichen;
+  $("#schalter-figuren").checked = E.einst.figuren;
   $("#schalter-nacht").checked = E.einst.nacht;
 };
 for (const b of $$("#ebenen-menue [data-grund]")) b.onclick = () => {
   E.einst.grund = b.dataset.grund; sichern(); karte.setGrund(E.einst.grund);
   for (const x of $$("#ebenen-menue [data-grund]")) x.setAttribute("aria-pressed", String(x === b));
 };
-$("#schalter-seezeichen").onchange = (e) => { E.einst.seezeichen = e.target.checked; sichern(); karte.setSeezeichen(E.einst.seezeichen); };
+$("#schalter-figuren").onchange = (e) => { E.einst.figuren = e.target.checked; sichern(); schiffeZeichnen(); listeZeichnen(); };
 $("#schalter-nacht").onchange = (e) => {
   E.einst.nacht = e.target.checked; sichern();
   for (const i of [0, 1, 2]) karte.map.setLayoutProperty("nacht-" + i, "visibility", E.einst.nacht ? "visible" : "none");

@@ -1,13 +1,13 @@
-// Karte und Globus (MapLibre): Grundkarte, Satellitenbild, Seezeichen, Tag/Nacht, Schiffe, Flugzeuge, Spuren
+// Karte und Globus (MapLibre): Grundkarte, Satellitenbild, Tag/Nacht, Schiffe (Figuren/Pfeile/Rümpfe), Flugzeuge, Spuren
 import * as ml from "../lib/maplibre-gl.mjs";
 import { symboleLaden, MASS } from "./symbole.js";
+import { kartenBild, KARTE_UNTEN } from "./figuren.js";
 import { nachtFlaeche } from "./geo.js";
 import { SCHIFF_GRUPPEN, HOEHEN_FARBEN, BODEN_FARBE } from "./texte.js";
 
 export const QUELLEN = {
   stil: "https://tiles.openfreemap.org/styles/fiord",
   satellit: "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpg",
-  seezeichen: "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png",
   schiffKacheln: "owk://{z}/{x}/{y}",
 };
 
@@ -29,6 +29,7 @@ function protokollAnmelden() {
   });
 }
 const SCHRIFT = ["Noto Sans Regular"], SCHRIFT_FETT = ["Noto Sans Bold"];
+const SCHIFF_EBENEN = ["kurs-linie", "schiffe-notfall", "schiffe", "schiffe-fig", "schiffe-name"];
 
 /** Größe: max(Mindestgröße · Zoomfaktor, echte Größe) – Stufen für jeden Zoom (zoom darf nur ganz außen stehen) */
 function groesse(faktor) {
@@ -38,7 +39,17 @@ function groesse(faktor) {
 }
 const zoomFaktorSchiff = (z) => (z <= 5 ? 0.62 : z >= 10 ? 1 : 0.62 + (z - 5) * 0.076);
 const zoomFaktorFlug = (z) => (z <= 2 ? 0.34 : z >= 9 ? 0.82 : 0.34 + (z - 2) * 0.0686);
-export { zoomFaktorSchiff, zoomFaktorFlug };
+// Größe der Schiffsfiguren je Zoomstufe (Karte und main.js rechnen gleich)
+const FIG_STUFEN = [[5, 0.36], [7, 0.48], [9, 0.66], [11, 0.86], [13, 1.05], [15, 1.2]];
+function figZoom(z) {
+  if (z <= FIG_STUFEN[0][0]) return FIG_STUFEN[0][1];
+  for (let i = 1; i < FIG_STUFEN.length; i++) {
+    const [z1, f1] = FIG_STUFEN[i], [z0, f0] = FIG_STUFEN[i - 1];
+    if (z <= z1) return f0 + (f1 - f0) * (z - z0) / (z1 - z0);
+  }
+  return FIG_STUFEN[FIG_STUFEN.length - 1][1];
+}
+export { zoomFaktorSchiff, zoomFaktorFlug, figZoom };
 
 /** Gruppe einer AIS-Schiffsart als Ausdruck (für die Kacheln der Übersicht) */
 function gruppeAusdruck() {
@@ -114,7 +125,6 @@ export class Karte {
     this.opt = opt;
     this.modus = opt.modus || "schiffe";
     this.grund = "karte";
-    this.seezeichen = true;
     this.bereit = false;
     this.filterSchiff = null;
   }
@@ -131,7 +141,15 @@ export class Karte {
     this.map.touchZoomRotate.enableRotation();
     await new Promise((res) => this.map.once("load", res));
     symboleLaden(this.map);
-    this.map.on("styleimagemissing", () => symboleLaden(this.map));
+    // Schiffsfiguren erst erzeugen, wenn sie gebraucht werden (fig-<art>-<gruppe>-<r|l>)
+    const figHolen = (id) => {
+      const m = /^fig-([a-z]+)-([a-z]+)-([rl])$/.exec(id || "");
+      if (!m) return false;
+      if (!this.map.hasImage(id)) this.map.addImage(id, kartenBild(m[1], (SCHIFF_GRUPPEN[m[2]] || SCHIFF_GRUPPEN.sonst).farbe, m[3] === "r"), { pixelRatio: 2 });
+      return true;
+    };
+    if (this.map.setMissingStyleImageResolver) this.map.setMissingStyleImageResolver(async (id) => { figHolen(id); });
+    this.map.on("styleimagemissing", (e) => { if (!figHolen(e.id)) symboleLaden(this.map); });
     this._ebenen();
     this._ereignisse();
     this.bereit = true;
@@ -160,8 +178,6 @@ export class Karte {
       m.addLayer({ id: "nacht-" + i, type: "fill", source: "nacht", filter: ["==", ["get", "h0"], h],
         paint: { "fill-color": "#000814", "fill-opacity": ["interpolate", ["linear"], ["zoom"], 0, 0.2, 5, 0.16, 7, 0], "fill-antialias": false } }, vorLabels);
     }
-    m.addSource("seezeichen", { type: "raster", tiles: [QUELLEN.seezeichen], tileSize: 256, minzoom: 9, maxzoom: 18, attribution: '<a href="https://www.openseamap.org" target="_blank">OpenSeaMap</a>' });
-    m.addLayer({ id: "seezeichen", type: "raster", source: "seezeichen", minzoom: 10, paint: { "raster-opacity": 0.9 } }, vorLabels);
 
     // Spuren und Routen
     m.addSource("spur", { type: "geojson", data: leer, lineMetrics: true });
@@ -193,8 +209,13 @@ export class Karte {
       paint: { "icon-color": farbeNachGruppe(g), "icon-halo-color": "rgba(3,7,14,0.7)", "icon-halo-width": 0.8 } });
 
     // Schiffe: einzeln und live
+    m.addSource("kurs", { type: "geojson", data: leer });
+    m.addLayer({ id: "kurs-linie", type: "line", source: "kurs", layout: { "line-cap": "round", visibility: "none" },
+      paint: { "line-color": farbeNachGruppe(["get", "g"]), "line-width": ["interpolate", ["linear"], ["zoom"], 8, 1.2, 14, 2.6], "line-opacity": 0.85 } });
     m.addSource("schiffe", { type: "geojson", data: leer, promoteId: "id" });
-    m.addLayer({ id: "schiffe", type: "symbol", source: "schiffe",
+    m.addLayer({ id: "schiffe-notfall", type: "circle", source: "schiffe", filter: ["==", ["get", "nf"], 1], layout: { visibility: "none" },
+      paint: { "circle-radius": 22, "circle-color": "rgba(255,40,40,0.18)", "circle-stroke-color": "#ff3b3b", "circle-stroke-width": 2.5, "circle-pitch-alignment": "map" } });
+    m.addLayer({ id: "schiffe", type: "symbol", source: "schiffe", filter: ["!=", ["get", "art"], "fig"],
       layout: {
         "icon-image": ["get", "ic"], "icon-size": groesse(zoomFaktorSchiff), "icon-rotate": ["get", "rot"],
         "icon-rotation-alignment": "map", "icon-pitch-alignment": "map", "icon-allow-overlap": true, "icon-ignore-placement": true,
@@ -206,6 +227,15 @@ export class Karte {
         "icon-halo-width": ["case", ["boolean", ["feature-state", "wahl"], false], 2.4, ["==", ["get", "nf"], 1], 2.4, 1],
         "icon-opacity": ["case", ["==", ["get", "alt"], 1], 0.5, 1],
       } });
+    // Figuren (Seitenansicht je nach Art) – stehen aufrecht, Wasserlinie am Ort des Schiffs
+    m.addLayer({ id: "schiffe-fig", type: "symbol", source: "schiffe", filter: ["==", ["get", "art"], "fig"],
+      layout: {
+        "icon-image": ["get", "ic"],
+        "icon-size": ["interpolate", ["linear"], ["zoom"], ...FIG_STUFEN.flatMap(([z, f]) => [z, ["*", ["get", "smin"], f]])],
+        "icon-anchor": "bottom", "icon-offset": [0, KARTE_UNTEN], "icon-rotation-alignment": "viewport", "icon-pitch-alignment": "viewport",
+        "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "sk"], visibility: "none",
+      },
+      paint: { "icon-opacity": ["case", ["==", ["get", "alt"], 1], 0.5, 1] } });
     m.addLayer({ id: "schiffe-name", type: "symbol", source: "schiffe", minzoom: 11.5,
       layout: { "text-field": ["get", "name"], "text-font": SCHRIFT, "text-size": ["interpolate", ["linear"], ["zoom"], 11.5, 10.5, 16, 13],
         "text-offset": [0, 1.3], "text-anchor": "top", "text-optional": true, "text-max-width": 9, "symbol-sort-key": ["get", "sk"], visibility: "none" },
@@ -233,12 +263,12 @@ export class Karte {
     // Auswahl-Ring
     m.addSource("auswahl", { type: "geojson", data: leer });
     m.addLayer({ id: "auswahl", type: "circle", source: "auswahl",
-      paint: { "circle-radius": ["coalesce", ["get", "r"], 20], "circle-color": "rgba(255,255,255,0.06)", "circle-stroke-color": "#ffffff", "circle-stroke-width": 2, "circle-pitch-alignment": "map" } });
+      paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], ...FIG_STUFEN.flatMap(([z, k]) => [z, ["case", ["has", "fs"], ["max", 16, ["+", 5, ["*", 32 * k, ["get", "fs"]]]], ["coalesce", ["get", "r"], 20]]])], "circle-color": "rgba(255,255,255,0.06)", "circle-stroke-color": "#ffffff", "circle-stroke-width": 2, "circle-pitch-alignment": "map", "circle-translate-anchor": "viewport" } });
   }
 
   _ereignisse() {
     const m = this.map;
-    const ebenen = () => (this.modus === "schiffe" ? ["schiffe", "schiffe-uebersicht"] : ["flug"]);
+    const ebenen = () => (this.modus === "schiffe" ? ["schiffe", "schiffe-fig", "schiffe-uebersicht"] : ["flug"]);
     m.on("click", (e) => {
       const r = e.originalEvent && e.originalEvent.pointerType === "mouse" ? 10 : 22;
       const box = [[e.point.x - r, e.point.y - r], [e.point.x + r, e.point.y + r]];
@@ -261,7 +291,7 @@ export class Karte {
     m.on("dragstart", () => this.opt.onZiehen && this.opt.onZiehen());
     m.on("rotate", () => this.opt.onDrehen && this.opt.onDrehen());
     m.on("pitch", () => this.opt.onDrehen && this.opt.onDrehen());
-    for (const l of ["schiffe", "schiffe-uebersicht", "flug"]) {
+    for (const l of ["schiffe", "schiffe-fig", "schiffe-uebersicht", "flug"]) {
       m.on("mouseenter", l, () => (m.getCanvas().style.cursor = "pointer"));
       m.on("mouseleave", l, () => (m.getCanvas().style.cursor = ""));
     }
@@ -272,9 +302,8 @@ export class Karte {
     this.modus = modus;
     if (!this.bereit) return;
     const s = modus === "schiffe";
-    this._sicht(["schiffe", "schiffe-name"], s);
+    this._sicht(SCHIFF_EBENEN, s);
     this._sicht(["flug", "flug-name"], !s);
-    this._sicht(["seezeichen"], s && this.seezeichen);
     if (!s) this._sicht(["schiffe-uebersicht"], false);
     this.setSpur(null);
     this.setAuswahl(null);
@@ -283,21 +312,24 @@ export class Karte {
   setSchiffAnsicht(uebersicht) {
     if (!this.bereit || this.modus !== "schiffe") return;
     this._sicht(["schiffe-uebersicht"], uebersicht);
-    this._sicht(["schiffe", "schiffe-name"], !uebersicht);
+    this._sicht(SCHIFF_EBENEN, !uebersicht);
   }
   _sicht(ids, an) { for (const id of ids) if (this.map.getLayer(id)) this.map.setLayoutProperty(id, "visibility", an ? "visible" : "none"); }
   setGrund(g) {
     this.grund = g;
     this._sicht(["satellit"], g === "satellit");
   }
-  setSeezeichen(an) { this.seezeichen = an; this._sicht(["seezeichen"], an && this.modus === "schiffe"); }
 
   /** Filter nach Schiffsgruppen (Liste der sichtbaren Gruppen) */
   setSchiffFilter(gruppen) {
     if (!this.bereit) return;
     const f = gruppen ? ["in", ["get", "g"], ["literal", gruppen]] : null;
-    this.map.setFilter("schiffe", f);
+    const und = (a) => (f ? ["all", a, f] : a);
+    this.map.setFilter("schiffe", und(["!=", ["get", "art"], "fig"]));
+    this.map.setFilter("schiffe-fig", und(["==", ["get", "art"], "fig"]));
+    this.map.setFilter("schiffe-notfall", und(["==", ["get", "nf"], 1]));
     this.map.setFilter("schiffe-name", f);
+    this.map.setFilter("kurs-linie", f);
     this.map.setFilter("schiffe-uebersicht", gruppen ? ["in", gruppeAusdruck(), ["literal", gruppen]] : null);
   }
   setFlugFilter(f) {
@@ -319,9 +351,15 @@ export class Karte {
     if (src) src.setData({ type: "FeatureCollection", features });
   }
   setSpur(features) { this.setDaten("spur", features || []); }
-  setAuswahl(f, radius = 20) {
+  /** Ring um das gewählte Objekt; fig = Größe der Schiffsfigur (smin) – der Ring umfasst dann die ganze Figur über ihrem Ort */
+  setAuswahl(f, radius = 20, fig = 0) {
     if (!this.bereit) return;
-    this.setDaten("auswahl", f ? [{ type: "Feature", properties: { r: radius }, geometry: { type: "Point", coordinates: f } }] : []);
+    if (fig !== this._ringFig) {
+      this._ringFig = fig;
+      this.map.setPaintProperty("auswahl", "circle-translate", fig
+        ? ["interpolate", ["linear"], ["zoom"], ...FIG_STUFEN.flatMap(([z, k]) => [z, ["literal", [0, -64 * fig * k * 0.12]]])] : [0, 0]);
+    }
+    this.setDaten("auswahl", f ? [{ type: "Feature", properties: fig ? { r: radius, fs: fig } : { r: radius }, geometry: { type: "Point", coordinates: f } }] : []);
   }
   /** weiße Umrandung am gewählten Objekt */
   setWahlZustand(quelle, id, an) {

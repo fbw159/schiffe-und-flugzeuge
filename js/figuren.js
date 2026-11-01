@@ -162,26 +162,41 @@ export function figur(art, farbe, px) {
   const key = `${art}|${farbe}|${stufe}|${pr}`;
   let c = cache.get(key);
   if (c) return c;
+  c = rendern(art, farbe, stufe, pr, false);
+  if (cache.size > 600) cache.clear();
+  cache.set(key, c);
+  return c;
+}
+
+/** Zeichnen mit dunklem Rand; spiegeln = Bug nach links */
+function rendern(art, farbe, px, pr, spiegeln) {
   const seite = art.startsWith("seite-");
   const lw = seite ? SEITE_W : MASS[art].w, lh = seite ? SEITE_H : MASS[art].h;
-  const k = stufe / lw, pad = 3;
+  const k = px / lw, pad = 3;
   const W = Math.ceil((lw * k + 2 * pad) * pr), H = Math.ceil((lh * k + 2 * pad) * pr);
   const zeichne = (g, schatten) => {
-    g.setTransform(pr * k, 0, 0, pr * k, pad * pr, pad * pr);
+    if (spiegeln) g.setTransform(-pr * k, 0, 0, pr * k, W - pad * pr, pad * pr);
+    else g.setTransform(pr * k, 0, 0, pr * k, pad * pr, pad * pr);
     if (seite) (SEITE[art.slice(6)] || SEITE.sonst)(g, farben(farbe, schatten));
     else { g.fillStyle = schatten ? "rgba(0,0,0,0.88)" : farbe; g.strokeStyle = g.fillStyle; symbolPfad(art, g); }
   };
   const dunkel = leinwand(W, H);
   zeichne(dunkel.getContext("2d"), true);
-  c = leinwand(W, H);
+  const c = leinwand(W, H);
   const g = c.getContext("2d");
   const r = 1.3 * pr;
   for (const [dx, dy] of [[-r, 0], [r, 0], [0, -r], [0, r], [-r * 0.7, -r * 0.7], [r * 0.7, -r * 0.7], [-r * 0.7, r * 0.7], [r * 0.7, r * 0.7]]) g.drawImage(dunkel, dx, dy);
   zeichne(g, false);
   c.w = W / pr; c.h = H / pr; c.pad = pad; c.innenH = lh * k;
-  if (cache.size > 600) cache.clear();
-  cache.set(key, c);
   return c;
+}
+
+/** Abstand Wasserlinie → Unterkante des Kartenbilds (logische Pixel bei Bildbreite 64) */
+export const KARTE_UNTEN = 3 + (SEITE_H - 19);
+/** Kartenbild für MapLibre (map.addImage, pixelRatio 2): Name „fig-<art>-<gruppe>-<r|l>“ */
+export function kartenBild(art, farbe, rechts) {
+  const c = rendern("seite-" + art, farbe, SEITE_W, 2, !rechts);
+  return { width: c.width, height: c.height, data: c.getContext("2d").getImageData(0, 0, c.width, c.height).data };
 }
 
 const vorschauCache = new Map();

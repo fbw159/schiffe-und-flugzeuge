@@ -71,7 +71,7 @@
     <button data-grund="karte" aria-pressed="true"><span class="vorschau v-karte"></span>Karte</button>
     <button data-grund="satellit" aria-pressed="false"><span class="vorschau v-satellit"></span>Satellit</button>
   </div>
-  <label class="schalter nur-schiffe"><input type="checkbox" id="schalter-seezeichen" checked><span></span>Seezeichen &amp; Tonnen</label>
+  <label class="schalter nur-schiffe"><input type="checkbox" id="schalter-figuren" checked><span></span>Schiffe als Figuren</label>
   <label class="schalter"><input type="checkbox" id="schalter-nacht" checked><span></span>Tag und Nacht zeigen</label>
 </div>
 
@@ -174,7 +174,7 @@
       <ul>
         <li>Schiffe: <a href="https://openwaters.io/ais/" target="_blank" rel="noopener">Open Waters AIS</a> (frei für private Nutzung) mit Daten von AISHub, aisstream.io, Digitraffic (CC BY 4.0), BarentsWatch (NLOD, „Data delivered by BarentsWatch“) und freiwilligen Empfängern (CC0). Schiffsregister und Fotos: Wikidata (CC0) und Wikimedia Commons (Lizenz je Foto).</li>
         <li>Flugzeuge: <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a> (ODbL), Routen und Flugzeugdaten von <a href="https://www.adsbdb.com" target="_blank" rel="noopener">adsbdb</a>, Fotos von <a href="https://www.planespotters.net" target="_blank" rel="noopener">planespotters.net</a>.</li>
-        <li>Karte: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende, OpenMapTiles. Seezeichen: <a href="https://www.openseamap.org" target="_blank" rel="noopener">OpenSeaMap</a> (CC BY-SA). Satellitenbild: Sentinel-2 cloudless 2024 von <a href="https://s2maps.eu" target="_blank" rel="noopener">EOX</a> (CC BY-NC-SA 4.0, enthält veränderte Copernicus-Sentinel-Daten).</li>
+        <li>Karte: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende, OpenMapTiles. Satellitenbild: Sentinel-2 cloudless 2024 von <a href="https://s2maps.eu" target="_blank" rel="noopener">EOX</a> (CC BY-NC-SA 4.0, enthält veränderte Copernicus-Sentinel-Daten).</li>
         <li>Häfen: UN/LOCODE (UNECE). Missweisung: WMM2025 (NOAA). Kartenbibliothek: MapLibre GL JS (BSD-3).</li>
         <li>Nicht für die Navigation! Daten können fehlen, verspätet oder falsch sein.</li>
       </ul>
@@ -190,6 +190,7 @@
     <p><b>Karte:</b> Mit einem Finger verschieben, mit zwei Fingern zoomen und drehen. Zwei Finger nebeneinander hoch- oder runterschieben neigt die Karte. Ganz herausgezoomt siehst du die ganze Erde als Globus mit Tag und Nacht.</p>
     <p><b>Größe:</b> Beim Heranzoomen werden Schiffe und Flugzeuge in ihrer echten Größe gezeigt – ein 400-m-Containerschiff ist dann viel größer als ein Segelboot.</p>
     <p><b>Antippen:</b> Zeigt alles, was bekannt ist: Foto, Art, Größe, Tempo, Ziel, Baujahr, Werft, Route, Höhe, Wetter in Flughöhe …</p>
+    <p><b>Schiffe</b> erscheinen als kleine Figur ihrer Art (Containerschiff, Tanker, Fähre, Segelboot …), der Strich davor zeigt, wohin sie fahren. Ganz nah siehst du sie von oben in echter Größe. Im Menü mit den Ebenen lässt sich auf schlichte Pfeile umschalten.</p>
     <p><b>Farben:</b> Schiffe nach Art (Legende unten links, antippen blendet aus). Flugzeuge nach Höhe: orange = tief, grün = mittel, blau/lila = Reiseflughöhe, grau = am Boden.</p>
     <p><b>Live-Blick:</b> Handy aufrecht vor dich halten und auf ein Schiff oder Flugzeug richten – du siehst Name und Infos genau dort, wo es ist. Tippe ein Objekt an für mehr. Unten kannst du eins auswählen, dann zeigt ein Pfeil, wohin du schauen musst.</p>
     <p class="hinweis-klein">Schiffe senden ihre Daten per AIS, Flugzeuge per ADS-B. Empfangen werden sie von Freiwilligen auf der ganzen Welt – darum fehlt manchmal etwas, besonders weit draußen auf dem Meer. Nicht für die Navigation.</p>
