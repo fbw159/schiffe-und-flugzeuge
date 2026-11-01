@@ -90,6 +90,7 @@ export class FlugDaten {
     const jetzt = j.now || Date.now();
     for (const a of j.ac || []) {
       if (a.lat == null || a.lon == null) continue;
+      if (a.t === "TWR" || a.t === "GND" || a.category === "C3") continue; // feste Sender am Flughafen
       const hex = a.hex;
       const tPos = jetzt - (a.seen_pos ?? a.seen ?? 0) * 1000;
       let f = this.flieger.get(hex);

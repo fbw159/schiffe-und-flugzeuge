@@ -8,6 +8,13 @@ const MAX_FLAECHE = 95; // anonym: höchstens 100 Quadratgrad je Abfrage
 
 const fehlt = (v, wert) => v == null || v === wert;
 const sauber = (s) => (s == null ? "" : String(s).replace(/@+/g, " ").replace(/\s+/g, " ").trim());
+const rufzeichen = (s) => { const t = sauber(s); return /^[-.\s0]*$/.test(t) ? "" : t; };
+/** Maße prüfen: 511 bzw. 63 bedeuten „so viel oder mehr“ (oft Platzhalter), über 460 m gibt es kein Schiff */
+function masseGueltig(s) {
+  const L = (s.tb || 0) + (s.ts || 0);
+  if (s.tb >= 511 || s.ts >= 511 || L > 460 || (s.len && s.len > 460)) { s.len = null; s.beam = null; s.tb = s.ts = s.tp = s.tsb = null; return; }
+  if (s.beam && (s.beam > 70 || (s.tp >= 63 && s.tsb >= 63))) { s.beam = null; s.tp = s.tsb = null; }
+}
 
 /** Ausschnitt begrenzen: höchstens MAX_FLAECHE Quadratgrad, um die Mitte herum */
 export function begrenzeBox(b, rand = 0.12) {
@@ -89,7 +96,8 @@ export class SchiffDaten {
     s.len = p.length || s.len || null; s.beam = p.beam || s.beam || null;
     s.tb = p.to_bow ?? s.tb; s.ts = p.to_stern ?? s.ts; s.tp = p.to_port ?? s.tp; s.tsb = p.to_starboard ?? s.tsb;
     s.ziel = p.destination ?? s.ziel; s.eta = p.eta ?? s.eta; s.tief = p.draught ?? s.tief; s.imo = p.imo ?? s.imo;
-    s.ruf = p.callsign ?? s.ruf; s.flagge = p.flag ?? s.flagge; s.klasse = p.class ?? s.klasse; s.quelle = p.source;
+    s.ruf = p.callsign != null ? rufzeichen(p.callsign) : s.ruf; s.flagge = p.flag ?? s.flagge; s.klasse = p.class ?? s.klasse; s.quelle = p.source;
+    masseGueltig(s);
     s.g = schiffGruppe(s.typ, s.kind);
     this.schiffe.set(id, s);
   }
@@ -174,7 +182,7 @@ export class SchiffDaten {
       }
     } else if (typ === "ShipStaticData") {
       if (m.Name) s.name = sauber(m.Name);
-      if (m.CallSign) s.ruf = sauber(m.CallSign);
+      if (m.CallSign) s.ruf = rufzeichen(m.CallSign);
       if (m.ImoNumber) s.imo = m.ImoNumber;
       if (m.Type != null) s.typ = m.Type;
       if (m.Dimension) this._mass(s, m.Dimension);
@@ -187,7 +195,7 @@ export class SchiffDaten {
       if (m.ReportA && m.ReportA.Valid && m.ReportA.Name) s.name = sauber(m.ReportA.Name);
       if (m.ReportB && m.ReportB.Valid) {
         if (m.ReportB.ShipType) s.typ = m.ReportB.ShipType;
-        if (m.ReportB.CallSign) s.ruf = sauber(m.ReportB.CallSign);
+        if (m.ReportB.CallSign) s.ruf = rufzeichen(m.ReportB.CallSign);
         if (m.ReportB.Dimension) this._mass(s, m.ReportB.Dimension);
       }
     } else return;
@@ -200,6 +208,7 @@ export class SchiffDaten {
     if (!d || !(d.A + d.B > 0)) return;
     s.tb = d.A; s.ts = d.B; s.tp = d.C; s.tsb = d.D;
     s.len = d.A + d.B; if (d.C + d.D > 0) s.beam = d.C + d.D;
+    masseGueltig(s);
   }
 
   /** alte Einträge entfernen (unterwegs > 40 min, liegend > 8 Tage) */
