@@ -8,8 +8,26 @@ export const QUELLEN = {
   stil: "https://tiles.openfreemap.org/styles/fiord",
   satellit: "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpg",
   seezeichen: "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png",
-  schiffKacheln: "https://ais.openwaters.io/v1/vessels/tiles/{z}/{x}/{y}?kind=vessel,sar",
+  schiffKacheln: "owk://{z}/{x}/{y}",
 };
+
+// Schiffs-Kacheln im Hauptfaden holen (eigenes Protokoll „owk://“): manche Browser-Umgebungen ließen die
+// Abrufe aus dem Kartenhelfer (Web Worker) hängen. Außerdem lehnt Open Waters unbekannte Parameter ab (400),
+// darum wird zum Auffrischen nur „neu=“ im eigenen Protokoll geändert und dann ohne Cache geholt.
+let protokoll = false;
+function protokollAnmelden() {
+  if (protokoll) return;
+  protokoll = true;
+  ml.addProtocol("owk", async (params, abbruch) => {
+    const m = /^owk:\/\/(\d+)\/(\d+)\/(\d+)/.exec(params.url);
+    if (!m) throw new Error("Kachel?");
+    const url = `https://ais.openwaters.io/v1/vessels/tiles/${m[1]}/${m[2]}/${m[3]}?kind=vessel,sar`;
+    const r = await fetch(url, { signal: abbruch && abbruch.signal, cache: params.url.includes("neu=") ? "no-cache" : "default" });
+    if (r.status === 204 || r.status === 404) return { data: new ArrayBuffer(0) };
+    if (!r.ok) throw new Error("Kachel HTTP " + r.status);
+    return { data: await r.arrayBuffer() };
+  });
+}
 const SCHRIFT = ["Noto Sans Regular"], SCHRIFT_FETT = ["Noto Sans Bold"];
 
 /** Größe: max(Mindestgröße · Zoomfaktor, echte Größe) – Stufen für jeden Zoom (zoom darf nur ganz außen stehen) */
@@ -102,6 +120,7 @@ export class Karte {
   }
 
   async start(mitte, zoom) {
+    protokollAnmelden();
     const stil = await grundStil();
     this.map = new ml.Map({
       container: this.el, style: stil, center: mitte, zoom, maxPitch: 75,
@@ -292,7 +311,7 @@ export class Karte {
     const src = this.map.getSource("schiffKacheln");
     if (!src) return;
     const t = Math.floor(Date.now() / 60000);
-    src.setTiles([QUELLEN.schiffKacheln + "&t=" + t]);
+    src.setTiles([QUELLEN.schiffKacheln + "?neu=" + t]);
   }
 
   setDaten(quelle, features) {

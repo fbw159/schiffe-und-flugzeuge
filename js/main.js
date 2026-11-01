@@ -106,6 +106,7 @@ async function start() {
   const ziel = () => {
     if (E.angeflogen) return;
     E.angeflogen = true;
+    if (Math.abs(karte.zoom - b.zoom) > 0.3 && !anfang.schiff && !anfang.flug) return; // schon selbst bewegt
     if (anfang.schiff) { schiffOeffnen(anfang.schiff, true); return; }
     if (anfang.flug) { flugOeffnen(anfang.flug, true); return; }
     const o = E.ich || speicher.lies("sf.ort", null);
