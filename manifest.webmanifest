@@ -1,0 +1,14 @@
+{
+  "name": "Schiffe & Flugzeuge live",
+  "short_name": "Schiffe & Flieger",
+  "description": "Schiffe und Flugzeuge live auf dem Globus – mit Live-Blick durch die Kamera.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#05070d",
+  "theme_color": "#05070d",
+  "lang": "de",
+  "icons": [
+    { "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "img/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

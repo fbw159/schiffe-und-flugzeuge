@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#05070d">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Schiffe und Flugzeuge live auf einem Globus: Größe, Kurs, Ziel, Fotos und viele Infos – und der Live-Blick: Handy auf ein Schiff oder Flugzeug halten und sehen, was es ist.">
+<title>Schiffe &amp; Flugzeuge live</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="img/icon-192.png">
+<link rel="apple-touch-icon" href="img/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="lib/maplibre-gl.css">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body data-modus="schiffe">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-ort" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="currentColor"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 1.5v3.2M12 19.3v3.2M1.5 12h3.2M19.3 12h3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-zahnrad" viewBox="0 0 24 24"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L14.9 3h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.4 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.8 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5L19.4 13ZM12.9 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z" transform="translate(-0.9 0)"/></symbol>
+    <symbol id="i-hilfe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9.2 9.3a2.9 2.9 0 1 1 4.3 2.5c-.9.5-1.5 1.1-1.5 2.1v.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17.6" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-zu" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-schiff" viewBox="0 0 24 24"><path d="M4 14.5h16l-2.4 5.2a1.5 1.5 0 0 1-1.4.9H7.8a1.5 1.5 0 0 1-1.4-.9z" fill="currentColor"/><path d="M7 14V9.2h10V14M10 9.2V6h4v3.2M11.4 6V3.5h1.2V6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-flug" viewBox="0 0 24 24"><path fill="currentColor" d="M21 15.6v-1.9l-7.6-4.8V3.7a1.4 1.4 0 0 0-2.8 0v5.2L3 13.7v1.9l7.6-2.4v5.1l-2 1.5v1.5l3.4-1 3.4 1v-1.5l-2-1.5v-5.1z"/></symbol>
+    <symbol id="i-ebenen" viewBox="0 0 24 24"><path d="M12 3 2.5 8 12 13l9.5-5z" fill="currentColor"/><path d="M2.5 12 12 17l9.5-5M2.5 16 12 21l9.5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-3d" viewBox="0 0 24 24"><path d="M12 2.8 3.6 7.4v9.2l8.4 4.6 8.4-4.6V7.4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M3.6 7.4 12 12l8.4-4.6M12 12v9.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-nadel" viewBox="0 0 24 24"><path d="M12 2.5 15.6 12h-7.2z" fill="#ff6b5a"/><path d="M12 21.5 8.4 12h7.2z" fill="currentColor" opacity=".9"/><circle cx="12" cy="12" r="1.6" fill="#0b1020"/></symbol>
+    <symbol id="i-kamera" viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.5-2h6.6l1.5 2H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-live" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="11" r="3.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 6v1.8M12 14.2V16M7 11h1.8M15.2 11H17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="18.6" r="1" fill="currentColor"/></symbol>
+    <symbol id="i-folgen" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/><path d="M12 1.8v3M12 19.2v3M1.8 12h3M19.2 12h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-spur" viewBox="0 0 24 24"><path d="M3 19c3-1 3-6 7-6s3 5 7 4 3-8 4-12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2.5 2.5"/><circle cx="21" cy="5" r="2" fill="currentColor"/></symbol>
+    <symbol id="i-suche" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.4 15.4 21 21" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+    <symbol id="i-klappen" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-teilen" viewBox="0 0 24 24"><circle cx="18" cy="5.5" r="2.6" fill="currentColor"/><circle cx="6" cy="12" r="2.6" fill="currentColor"/><circle cx="18" cy="18.5" r="2.6" fill="currentColor"/><path d="M8.3 10.8l7.4-4M8.3 13.2l7.4 4" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-kompass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 5.2l2.7 6.8L12 18.8 9.3 12z" fill="currentColor" opacity=".45"/><path d="M12 5.2l2.7 6.8H9.3z" fill="currentColor"/></symbol>
+    <symbol id="i-pfeil" viewBox="0 0 24 24"><path d="M4 12h14M12.5 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-karte" viewBox="0 0 24 24"><path d="M3 6.5 8.5 4l7 2.5L21 4v13.5L15.5 20l-7-2.5L3 20z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 4v13.5M15.5 6.5V20" stroke="currentColor" stroke-width="1.8"/></symbol>
+  </defs>
+</svg>
+
+<div id="karte" aria-label="Globus und Karte mit Schiffen und Flugzeugen"></div>
+
+<header id="kopf">
+  <div class="kopf-text">
+    <h1 id="titel">Schiffe &amp; Flugzeuge</h1>
+    <p id="status-zeile"><span id="ort-text">Standort wird bestimmt …</span><span id="live-zeichen" class="live-zeichen" hidden> · <i></i>live</span></p>
+  </div>
+  <div class="kopf-knoepfe">
+    <button class="rund" id="knopf-ort" title="Zu meinem Standort" aria-label="Zu meinem Standort"><svg><use href="#i-ort"/></svg></button>
+    <button class="rund" id="knopf-einstellungen" title="Einstellungen" aria-label="Einstellungen"><svg><use href="#i-zahnrad"/></svg></button>
+    <button class="rund" id="knopf-hilfe" title="So funktioniert's" aria-label="Hilfe"><svg><use href="#i-hilfe"/></svg></button>
+  </div>
+</header>
+
+<div class="modus" role="tablist" aria-label="Was möchtest du sehen?">
+  <span class="modus-schieber" aria-hidden="true"></span>
+  <button role="tab" data-modus="schiffe" aria-selected="true"><svg><use href="#i-schiff"/></svg>Schiffe</button>
+  <button role="tab" data-modus="flugzeuge" aria-selected="false"><svg><use href="#i-flug"/></svg>Flugzeuge</button>
+</div>
+
+<div class="karten-knoepfe" id="karten-knoepfe">
+  <button class="rund" id="knopf-ebenen" aria-expanded="false" title="Kartenart" aria-label="Kartenart"><svg><use href="#i-ebenen"/></svg></button>
+  <button class="rund" id="knopf-3d" aria-pressed="false" title="Schräg von der Seite ansehen" aria-label="Schräg ansehen"><svg><use href="#i-3d"/></svg></button>
+  <button class="rund" id="knopf-norden" title="Norden nach oben" aria-label="Norden nach oben" hidden><svg><use href="#i-nadel"/></svg></button>
+</div>
+<div id="ebenen-menue" class="ebenen-menue" hidden>
+  <div class="ebenen-wahl">
+    <button data-grund="karte" aria-pressed="true"><span class="vorschau v-karte"></span>Karte</button>
+    <button data-grund="satellit" aria-pressed="false"><span class="vorschau v-satellit"></span>Satellit</button>
+  </div>
+  <label class="schalter nur-schiffe"><input type="checkbox" id="schalter-seezeichen" checked><span></span>Seezeichen &amp; Tonnen</label>
+  <label class="schalter"><input type="checkbox" id="schalter-nacht" checked><span></span>Tag und Nacht zeigen</label>
+</div>
+
+<div id="hinweis-chip" class="hinweis-chip" hidden></div>
+<div id="legende" class="legende" aria-label="Arten ein- und ausblenden"></div>
+<button id="knopf-live" class="knopf-live" title="Handy auf ein Schiff oder Flugzeug halten"><svg><use href="#i-live"/></svg><span>Live-Blick</span></button>
+
+<aside id="infobox" class="infobox" hidden aria-live="polite"></aside>
+
+<main id="blatt" class="blatt" data-hoehe="klein">
+  <div class="blatt-kopf" id="blatt-kopf">
+    <div class="griff" aria-hidden="true"><span></span></div>
+    <p class="kurz" id="kurz">Daten werden geladen …</p>
+    <nav class="reiter" role="tablist">
+      <button role="tab" data-reiter="liste" aria-selected="true">In der Nähe</button>
+      <button role="tab" data-reiter="highlights" aria-selected="false">Highlights</button>
+      <button role="tab" data-reiter="filter" aria-selected="false">Filter</button>
+    </nav>
+  </div>
+  <div class="blatt-inhalt" id="blatt-inhalt">
+    <section class="seite" id="seite-liste">
+      <div class="suchfeld">
+        <svg><use href="#i-suche"/></svg>
+        <input type="search" id="suche" placeholder="Suchen …" autocomplete="off" enterkeyhint="search" aria-label="Suchen">
+      </div>
+      <div class="filter sortierung" role="radiogroup" aria-label="Sortieren">
+        <button data-sort="nah" aria-pressed="true">Nächste</button>
+        <button data-sort="gross" aria-pressed="false">Größte</button>
+        <button data-sort="schnell" aria-pressed="false">Schnellste</button>
+        <button data-sort="hoch" class="nur-flug" aria-pressed="false">Höchste</button>
+      </div>
+      <p class="hinweis-klein" id="liste-hinweis"></p>
+      <ol class="objekt-liste" id="liste"></ol>
+    </section>
+    <section class="seite" id="seite-highlights" hidden>
+      <div id="highlights" class="highlights"></div>
+    </section>
+    <section class="seite" id="seite-filter" hidden>
+      <div id="filter-inhalt"></div>
+    </section>
+  </div>
+</main>
+
+<!-- Live-Blick: Kamera + Lagesensoren -->
+<section id="live" class="live" hidden aria-label="Live-Blick">
+  <video id="live-video" playsinline muted></video>
+  <canvas id="live-bild"></canvas>
+  <div class="live-oben">
+    <div class="live-titel">
+      <h2 id="live-titel">Live-Blick</h2>
+      <p id="live-unter">Halte das Handy aufrecht vor dich.</p>
+    </div>
+    <button class="rund hell" id="live-zu" aria-label="Live-Blick schließen"><svg><use href="#i-zu"/></svg></button>
+  </div>
+  <div class="live-seite">
+    <button class="rund hell" id="live-kamera" aria-pressed="false" title="Kamera ein/aus" aria-label="Kamera ein oder aus"><svg><use href="#i-kamera"/></svg></button>
+    <button class="rund hell" id="live-kompass" aria-pressed="false" title="Kompass abgleichen" aria-label="Kompass abgleichen"><svg><use href="#i-kompass"/></svg></button>
+    <button class="rund hell" id="live-modus" title="Schiffe/Flugzeuge" aria-label="Zwischen Schiffen und Flugzeugen wechseln"><svg><use href="#i-flug"/></svg></button>
+  </div>
+  <div id="live-kompass-feld" class="live-feld" hidden>
+    <p>Stimmt die Richtung nicht? Nimm ein bekanntes Schiff oder Flugzeug genau in den Kreis in der Mitte und tippe auf <b>Abgleichen</b>. Oder dreh von Hand nach.</p>
+    <div class="live-feld-knoepfe">
+      <button id="live-minus">−2°</button><span id="live-korrektur">0°</span><button id="live-plus">+2°</button>
+      <button id="live-abgleich" class="haupt">Abgleichen</button>
+    </div>
+  </div>
+  <div class="live-unten">
+    <div id="live-pfeil" class="live-pfeil" hidden><svg><use href="#i-pfeil"/></svg><span id="live-pfeil-text"></span></div>
+    <div id="live-info" class="live-info" hidden></div>
+    <div id="live-chips" class="live-chips"></div>
+    <div class="live-reichweite"><label for="live-weite">Reichweite</label><input type="range" id="live-weite" min="0" max="100" step="1"><span id="live-weite-text"></span></div>
+  </div>
+</section>
+
+<dialog id="dlg-einstellungen" class="dialog">
+  <form method="dialog">
+    <h2>Einstellungen</h2>
+    <fieldset>
+      <legend>Einheiten</legend>
+      <label class="zeile">Geschwindigkeit
+        <select id="e-tempo"><option value="beides">Knoten + km/h</option><option value="kmh">km/h</option><option value="kn">Knoten</option></select></label>
+      <label class="zeile">Flughöhe
+        <select id="e-hoehe"><option value="m">Meter</option><option value="ft">Fuß (wie Piloten)</option></select></label>
+    </fieldset>
+    <fieldset>
+      <legend>Live-Blick</legend>
+      <label class="zeile">Meine Augenhöhe über dem Wasser
+        <select id="e-auge"><option value="1.7">am Strand (1,7 m)</option><option value="5">auf der Mole (5 m)</option><option value="15">auf einem Deich/Turm (15 m)</option><option value="40">hoch oben (40 m)</option></select></label>
+      <label class="zeile">Beschriftung
+        <select id="e-beschriftung"><option value="voll">Name + Infos</option><option value="kurz">nur Name</option></select></label>
+    </fieldset>
+    <fieldset>
+      <legend>Vermittler für Flugdaten</legend>
+      <label class="zeile spalte">Adresse
+        <input type="url" id="e-relay" spellcheck="false" autocomplete="off"></label>
+      <p class="hinweis-klein">Freie Flugdaten-Dienste erlauben keine direkten Abrufe aus Webseiten. Darum holt ein kleiner eigener Cloudflare-Worker die Daten von adsb.lol. Nur ändern, wenn du weißt, was du tust.</p>
+    </fieldset>
+    <details class="quellen">
+      <summary>Datenquellen &amp; Lizenzen</summary>
+      <ul>
+        <li>Schiffe: <a href="https://openwaters.io/ais/" target="_blank" rel="noopener">Open Waters AIS</a> (frei für private Nutzung) mit Daten von AISHub, aisstream.io, Digitraffic (CC BY 4.0), BarentsWatch (NLOD, „Data delivered by BarentsWatch“) und freiwilligen Empfängern (CC0). Schiffsregister und Fotos: Wikidata (CC0) und Wikimedia Commons (Lizenz je Foto).</li>
+        <li>Flugzeuge: <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a> (ODbL), Routen und Flugzeugdaten von <a href="https://www.adsbdb.com" target="_blank" rel="noopener">adsbdb</a>, Fotos von <a href="https://www.planespotters.net" target="_blank" rel="noopener">planespotters.net</a>.</li>
+        <li>Karte: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende, OpenMapTiles. Seezeichen: <a href="https://www.openseamap.org" target="_blank" rel="noopener">OpenSeaMap</a> (CC BY-SA). Satellitenbild: Sentinel-2 cloudless 2024 von <a href="https://s2maps.eu" target="_blank" rel="noopener">EOX</a> (CC BY-NC-SA 4.0, enthält veränderte Copernicus-Sentinel-Daten).</li>
+        <li>Häfen: UN/LOCODE (UNECE). Missweisung: WMM2025 (NOAA). Kartenbibliothek: MapLibre GL JS (BSD-3).</li>
+        <li>Nicht für die Navigation! Daten können fehlen, verspätet oder falsch sein.</li>
+      </ul>
+    </details>
+    <div class="dialog-knoepfe"><button value="ok" class="haupt">Fertig</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlg-hilfe" class="dialog">
+  <form method="dialog">
+    <h2>So funktioniert's</h2>
+    <p><b>Oben umschalten:</b> Schiffe oder Flugzeuge.</p>
+    <p><b>Karte:</b> Mit einem Finger verschieben, mit zwei Fingern zoomen und drehen. Zwei Finger nebeneinander hoch- oder runterschieben neigt die Karte. Ganz herausgezoomt siehst du die ganze Erde als Globus mit Tag und Nacht.</p>
+    <p><b>Größe:</b> Beim Heranzoomen werden Schiffe und Flugzeuge in ihrer echten Größe gezeigt – ein 400-m-Containerschiff ist dann viel größer als ein Segelboot.</p>
+    <p><b>Antippen:</b> Zeigt alles, was bekannt ist: Foto, Art, Größe, Tempo, Ziel, Baujahr, Werft, Route, Höhe, Wetter in Flughöhe …</p>
+    <p><b>Farben:</b> Schiffe nach Art (Legende unten links, antippen blendet aus). Flugzeuge nach Höhe: orange = tief, grün = mittel, blau/lila = Reiseflughöhe, grau = am Boden.</p>
+    <p><b>Live-Blick:</b> Handy aufrecht vor dich halten und auf ein Schiff oder Flugzeug richten – du siehst Name und Infos genau dort, wo es ist. Tippe ein Objekt an für mehr. Unten kannst du eins auswählen, dann zeigt ein Pfeil, wohin du schauen musst.</p>
+    <p class="hinweis-klein">Schiffe senden ihre Daten per AIS, Flugzeuge per ADS-B. Empfangen werden sie von Freiwilligen auf der ganzen Welt – darum fehlt manchmal etwas, besonders weit draußen auf dem Meer. Nicht für die Navigation.</p>
+    <div class="dialog-knoepfe"><button value="ok" class="haupt">Alles klar</button></div>
+  </form>
+</dialog>
+
+<div id="meldung" role="status" hidden></div>
+<div id="lade" class="lade"><div class="lade-kreis"></div><p id="lade-text">Lade Globus …</p></div>
+<noscript><p style="padding:20px">Diese Seite braucht JavaScript.</p></noscript>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
